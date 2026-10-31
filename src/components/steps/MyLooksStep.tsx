@@ -5,6 +5,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { deleteLook, listLooks, lookImagePaths, type SavedLook } from "@/lib/account/looks";
 import { signedUrls } from "@/lib/account/storage";
 import { Button, Card, ErrorNote, EvidenceList, Note, OutfitPill, Spinner, StepHeader, VerdictPill } from "../ui";
+import { ZoomableImage } from "../ZoomableImage";
 
 function LookDetail({ look, urls }: { look: SavedLook; urls: Record<string, string> }) {
   const { t, tl, ev, locale } = useI18n();
@@ -13,15 +14,13 @@ function LookDetail({ look, urls }: { look: SavedLook; urls: Record<string, stri
       <div className="grid grid-cols-2 gap-3">
         {look.fullPath && urls[look.fullPath] && (
           <figure>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={urls[look.fullPath]} alt="" className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
+            <ZoomableImage src={urls[look.fullPath]} className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
             <figcaption className="mt-1.5 text-center text-xs text-muted">{t("looks.full")}</figcaption>
           </figure>
         )}
         {!look.fullPath && look.outfitPath && urls[look.outfitPath] && (
           <figure>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={urls[look.outfitPath]} alt="" className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
+            <ZoomableImage src={urls[look.outfitPath]} className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
             <figcaption className="mt-1.5 text-center text-xs text-muted">{t("look.outfit")}</figcaption>
           </figure>
         )}

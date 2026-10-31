@@ -8,6 +8,7 @@ import { renderShareCard } from "@/lib/share";
 import type { AxisVerdict, Goal, Slot, Verdict } from "@/lib/types";
 import type { Me, Trial } from "../ClaraApp";
 import { Button, Card, ConfidenceBadge, ErrorNote, EvidenceList, Note, SkeletonImage, Spinner, StepHeader, Swatch, VerdictPill } from "../ui";
+import { ZoomableImage } from "../ZoomableImage";
 
 function AxisCard({
   title,
@@ -225,14 +226,12 @@ export function VerdictStep({
       <Card className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <figure>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={me.bodyUrl} alt="" className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
+            <ZoomableImage src={me.bodyUrl} className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
             <figcaption className="mt-1.5 text-center text-xs text-muted">{t("verdict.you")}</figcaption>
           </figure>
           <figure>
             {trial.tryOnUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={trial.tryOnUrl} alt="" className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
+              <ZoomableImage src={trial.tryOnUrl} className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
             ) : tryOnBusy || !trial.tryOnError ? (
               <SkeletonImage label={t("verdict.tryingOn")} />
             ) : (
