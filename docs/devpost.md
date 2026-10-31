@@ -63,7 +63,7 @@ Clara starts from the garment *you* chose: a screenshot from any online store or
 
 - **Trust by design.** Six principles hold on every screen: show the work, try it instead of promising it, talk about goals instead of defects, admit what isn't known, rescue instead of forbidding, and care for the photo.
 - Six YouCam APIs chained in one flow that a new user understands without explanation: from one piece to a complete look, hair and makeup included.
-- The model never decides the verdict, and never invents a trait. It only explains measured evidence.
+- The model never decides the verdict. It is instructed to explain measured evidence; a language validator and template fallback check the wording, while the evidence remains visible for review.
 
 ## What we learned
 

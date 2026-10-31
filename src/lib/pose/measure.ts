@@ -231,7 +231,7 @@ export function measureBody({ landmarks, mask, heightCm, looseClothing }: Measur
   const range = (v: number, s: number): RatioRange => ({ value: v, low: v - s, high: v + s });
 
   const line = (y: number, w: { left: number; right: number }): OverlayLine => ({
-    y: y / H,
+    y: Math.max(0, Math.min(H - 1, y)) / H,
     x1: w.left / W,
     x2: (w.right + 1) / W,
   });

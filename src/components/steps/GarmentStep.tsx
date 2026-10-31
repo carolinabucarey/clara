@@ -120,8 +120,13 @@ export function GarmentStep({
   };
 
   const pickDemo = async (d: DemoGarment) => {
-    const blob = await fetch(d.src).then((r) => r.blob());
-    void run(blob);
+    try {
+      const res = await fetch(d.src);
+      if (!res.ok) throw new Error("demo_unavailable");
+      await run(await res.blob());
+    } catch {
+      setError(t("errors.imageUnreadable"));
+    }
   };
 
   const busy = stage !== "idle";

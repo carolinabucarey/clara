@@ -8,8 +8,11 @@ export function loadImage(src: string | Blob): Promise<HTMLImageElement> {
     const url = typeof src === "string" ? src : URL.createObjectURL(src);
     img.crossOrigin = "anonymous";
     img.decoding = "async";
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("image_load_failed"));
+    const release = () => {
+      if (typeof src !== "string") URL.revokeObjectURL(url);
+    };
+    img.onload = () => { release(); resolve(img); };
+    img.onerror = () => { release(); reject(new Error("image_load_failed")); };
     img.src = url;
   });
 }
@@ -43,8 +46,16 @@ export function canvasToBlob(canvas: HTMLCanvasElement, type = "image/jpeg", qua
 
 /** JPEG with the long side below YouCam's limits (makeup try-on wants < 1920). */
 export async function prepareUpload(img: HTMLImageElement | HTMLCanvasElement, maxSide = 1600, crop?: Rect) {
-  const canvas = toCanvas(img, maxSide, crop);
-  return { blob: await canvasToBlob(canvas), width: canvas.width, height: canvas.height, canvas };
+  let canvas = toCanvas(img, maxSide, crop);
+  let blob = await canvasToBlob(canvas);
+  // Two images plus multipart overhead must fit within the hosting request limit.
+  const maxBytes = 2 * 1024 * 1024;
+  if (blob.size > maxBytes) blob = await canvasToBlob(canvas, "image/jpeg", 0.75);
+  while (blob.size > maxBytes) {
+    canvas = toCanvas(canvas, Math.max(canvas.width, canvas.height) * 0.8);
+    blob = await canvasToBlob(canvas, "image/jpeg", 0.75);
+  }
+  return { blob, width: canvas.width, height: canvas.height, canvas };
 }
 
 export function imageSize(img: HTMLImageElement | HTMLCanvasElement) {

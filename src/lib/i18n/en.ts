@@ -5,6 +5,7 @@ export const en = {
     tagline: "The second opinion you need before you buy.",
   },
   nav: {
+    stepsLabel: "Steps",
     steps: { garment: "The piece", photos: "You", profile: "Profile", verdict: "Verdict", look: "Your look" },
     back: "Back",
     language: "Español",
@@ -12,7 +13,8 @@ export const en = {
     myLooks: "My looks",
   },
   privacy:
-    "Without an account, your photos are only used for this session and Clara stores nothing. With an account, Clara keeps only what you choose to save, in your private space, and you can delete it anytime. YouCam keeps processed results for 24 hours.",
+    "YouCam processes your photos for analysis and try-on. Claude receives the garment image and measured profile data to explain the advice. Clara stores only what you choose to save to your private account, and you can delete it anytime. Each provider applies its own retention policy.",
+  privacyDevelopment: "Development mode caches YouCam results on this computer to save API units. Use test images; this cache is always disabled in production.",
   common: {
     continue: "Continue",
     retry: "Try again",

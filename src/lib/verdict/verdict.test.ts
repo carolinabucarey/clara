@@ -135,6 +135,7 @@ describe("language validator", () => {
   it("rejects defect language and fruit labels", () => {
     expect(violations("en", { ...base, cut: { headline: "x", body: "It will hide your hips, great for a pear shape." } })).not.toEqual([]);
     expect(violations("es", { ...base, cut: { headline: "x", body: "Ayuda a disimular la cadera." } })).not.toEqual([]);
+    expect(violations("en", { ...base, cut: { headline: "x", body: "Ayuda a disimular la cadera." } })).not.toEqual([]);
   });
 });
 

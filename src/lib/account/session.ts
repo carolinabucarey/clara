@@ -70,7 +70,8 @@ export async function verifyEmailCode(email: string, token: string) {
 }
 
 export async function signOut() {
-  await supabase()?.auth.signOut();
+  const { error } = await client().auth.signOut();
+  if (error) throw new AccountError("generic");
 }
 
 /** Deletes the auth user (and, by cascade, every row) on the server; files go first. */

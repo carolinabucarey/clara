@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { AccountError, sendEmailCode, verifyEmailCode } from "@/lib/account/session";
 import { Button, ErrorNote } from "./ui";
@@ -23,6 +23,8 @@ export function AuthDialog({
 }) {
   const { t } = useI18n();
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const bodyId = useId();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
@@ -51,6 +53,8 @@ export function AuthDialog({
   return (
     <dialog
       ref={ref}
+      aria-labelledby={titleId}
+      aria-describedby={bodyId}
       onClose={onClose}
       className="m-auto w-[min(26rem,calc(100vw-2rem))] rounded-3xl border border-line bg-paper p-0 text-ink shadow-xl backdrop:bg-ink/40"
     >
@@ -70,8 +74,8 @@ export function AuthDialog({
         }}
       >
         <div>
-          <h2 className="font-display text-2xl">{t("account.dialogTitle")}</h2>
-          <p className="mt-1 text-sm text-muted">{t("account.dialogBody")}</p>
+          <h2 id={titleId} className="font-display text-2xl">{t("account.dialogTitle")}</h2>
+          <p id={bodyId} className="mt-1 text-sm text-muted">{t("account.dialogBody")}</p>
         </div>
 
         {!sent ? (

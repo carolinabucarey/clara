@@ -25,11 +25,17 @@ const TIMEOUT_MS = 120_000;
 
 const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
-    const t = setTimeout(resolve, ms);
-    signal?.addEventListener("abort", () => {
+    signal?.throwIfAborted();
+    const abort = () => {
       clearTimeout(t);
-      reject(new DOMException("aborted", "AbortError"));
-    });
+      signal?.removeEventListener("abort", abort);
+      reject(signal?.reason ?? new DOMException("aborted", "AbortError"));
+    };
+    const t = setTimeout(() => {
+      signal?.removeEventListener("abort", abort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", abort, { once: true });
   });
 
 async function json(res: Response) {
@@ -45,6 +51,8 @@ export async function runYouCam(
   input: { src: Blob; ref?: Blob; params?: Record<string, unknown> },
   signal?: AbortSignal,
 ): Promise<YouCamResult> {
+  // Bound the entire operation, including slow start/poll requests.
+  signal = signal ? AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]) : AbortSignal.timeout(TIMEOUT_MS);
   const form = new FormData();
   form.append("src", input.src, input.src.type === "image/png" ? "src.png" : "src.jpg");
   if (input.ref) form.append("ref", input.ref, input.ref.type === "image/png" ? "ref.png" : "ref.jpg");
@@ -64,7 +72,7 @@ export async function runYouCam(
     });
     const state = await json(res);
     if (state.status === "success") return state as YouCamResult;
-    if (state.status === "error") throw new YouCamTaskError(state.code ?? "generic");
+    if (!res.ok || state.status === "error") throw new YouCamTaskError(state.code ?? state.error ?? "generic");
   }
   throw new YouCamTaskError("timeout");
 }

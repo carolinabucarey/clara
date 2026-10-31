@@ -34,7 +34,7 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   };
   let res: Response;
   try {
-    res = await fetch(`${YOUCAM_BASE}${path}`, { ...init, headers, cache: "no-store" });
+    res = await fetch(`${YOUCAM_BASE}${path}`, { ...init, headers, cache: "no-store", signal: AbortSignal.timeout(15_000) });
   } catch (err) {
     throw new YouCamError("network_error", `Could not reach YouCam: ${(err as Error).message}`, 502);
   }
@@ -86,6 +86,7 @@ export async function uploadFile(feature: Feature, bytes: Uint8Array, contentTyp
     method: upload.method || "PUT",
     headers,
     body: new Blob([bytes as BlobPart], { type: contentType }),
+    signal: AbortSignal.timeout(20_000),
   });
   if (!put.ok) throw new YouCamError("upload_failed", `Upload to signed URL failed (${put.status})`, 502);
   return file.file_id;
@@ -168,6 +169,7 @@ export function isYouCamResultUrl(url: string): boolean {
     const u = new URL(url);
     return (
       u.protocol === "https:" &&
+      !u.username && !u.password && !u.port &&
       (u.hostname.endsWith(".amazonaws.com") ||
         u.hostname.endsWith(".makeupar.com") ||
         u.hostname.endsWith(".perfectcorp.com") ||

@@ -2,10 +2,11 @@
 
 import type { CachedResult } from "./cache";
 import type { Feature } from "./features";
+import { signedResultUrl } from "./result-image";
 
 /** Result URLs expire in ~2 h and come from S3 without CORS: serve them through our proxy. */
 export function proxiedUrl(remote: string): string {
-  return `/api/youcam/image?url=${encodeURIComponent(remote)}`;
+  return signedResultUrl(remote);
 }
 
 export function cachedResponse(feature: Feature, key: string, cached: CachedResult) {

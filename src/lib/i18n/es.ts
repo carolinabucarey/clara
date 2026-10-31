@@ -7,6 +7,7 @@ export const es: Dictionary = {
     tagline: "La segunda opinión que necesitas antes de comprar.",
   },
   nav: {
+    stepsLabel: "Pasos",
     steps: { garment: "La prenda", photos: "Tú", profile: "Perfil", verdict: "Veredicto", look: "Tu look" },
     back: "Volver",
     language: "English",
@@ -14,7 +15,8 @@ export const es: Dictionary = {
     myLooks: "Mis looks",
   },
   privacy:
-    "Sin cuenta, tus fotos se usan solo durante esta sesión y Clara no guarda nada. Con cuenta, Clara guarda solo lo que tú decides guardar, en tu espacio privado, y puedes borrarlo cuando quieras. YouCam conserva los resultados procesados durante 24 horas.",
+    "YouCam procesa tus fotos para el análisis y las pruebas. Claude recibe la imagen de la prenda y los datos medidos del perfil para explicar los consejos. Clara guarda solo lo que decides conservar en tu cuenta privada, y puedes borrarlo cuando quieras. Cada proveedor aplica su propia política de retención.",
+  privacyDevelopment: "El modo de desarrollo guarda resultados de YouCam en este computador para ahorrar unidades de API. Usa imágenes de prueba; esta caché siempre se desactiva en producción.",
   common: {
     continue: "Continuar",
     retry: "Intentar de nuevo",

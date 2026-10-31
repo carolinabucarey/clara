@@ -17,8 +17,9 @@ export function claude(): Anthropic {
   client ??= new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY!.trim(),
     baseURL: process.env.CLARA_ANTHROPIC_BASE_URL || "https://api.anthropic.com",
-    timeout: 60_000,
-    maxRetries: 1,
+    // Leave time for the route to return its template/manual fallback within 60 s.
+    timeout: 25_000,
+    maxRetries: 0,
   });
   return client;
 }

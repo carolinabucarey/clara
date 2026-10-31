@@ -5,11 +5,20 @@ import { describeGarmentColor } from "@/lib/color/garment";
 import { buildVerdict } from "@/lib/verdict";
 import { draftVerdict } from "@/lib/verdict/draft";
 import { VerdictRequestSchema } from "@/lib/verdict/schema";
+import { HttpError, rateLimit, readJson, requireSameOrigin } from "@/lib/http";
 
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  const parsed = VerdictRequestSchema.safeParse(await req.json().catch(() => null));
+  let body: unknown;
+  try {
+    requireSameOrigin(req);
+    rateLimit(req, "verdict");
+    body = await readJson(req);
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof HttpError ? err.code : "invalid_request" }, { status: err instanceof HttpError ? err.status : 400 });
+  }
+  const parsed = VerdictRequestSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "invalid_request", detail: parsed.error.issues }, { status: 400 });
   }

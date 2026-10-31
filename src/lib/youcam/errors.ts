@@ -12,7 +12,7 @@ const MAP: Array<[RegExp, string]> = [
   [/invalid_ref/, "garmentImage"],
   [/exceed_max_filesize|exceed_max_image_size/, "fileTooBig"],
   [/nsfw/, "nsfw"],
-  [/download_image|decode_image/, "imageUnreadable"],
+  [/download_image|decode_image|invalid_image/, "imageUnreadable"],
   [/CreditInsufficiency/i, "credits"],
   [/rate_limited|429/, "rateLimited"],
   [/missing_api_key|InvalidApiKey|InactiveApiKey|ExpiredApiKey|missing_anthropic_key/, "config"],

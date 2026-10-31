@@ -15,6 +15,7 @@ export function Button({
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" }) {
   return (
     <button
+      type="button"
       {...props}
       className={cx(
         "inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold transition",
@@ -221,13 +222,22 @@ export function ChipSelect<T extends string>({
         {uncertain && <span className="rounded-full bg-amber-soft px-2 py-0.5 text-[10px] normal-case tracking-normal text-amber">?</span>}
       </div>
       <div className="flex flex-wrap gap-1.5">
-        {options.map((o) => (
+        {options.map((o, i) => (
           <button
             key={o.value}
             type="button"
             role="radio"
             aria-checked={o.value === value}
+            tabIndex={o.value === value || (!options.some((option) => option.value === value) && i === 0) ? 0 : -1}
             onClick={() => onChange(o.value)}
+            onKeyDown={(e) => {
+              const delta = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+              if (!delta && e.key !== "Home" && e.key !== "End") return;
+              e.preventDefault();
+              const next = e.key === "Home" ? 0 : e.key === "End" ? options.length - 1 : (i + delta + options.length) % options.length;
+              onChange(options[next].value);
+              e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("button")[next]?.focus();
+            }}
             className={cx(
               "min-h-9 rounded-full border px-3 text-sm transition",
               o.value === value ? "border-ink bg-ink text-cream" : "border-line bg-paper text-ink hover:border-ink/40",
@@ -258,8 +268,9 @@ export function FilePicker({
       <input
         ref={ref}
         type="file"
+        aria-label={label}
         accept="image/*"
-        className="sr-only"
+        hidden
         onChange={(e) => {
           const f = e.target.files?.[0];
           if (f) onFile(f);

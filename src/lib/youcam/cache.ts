@@ -9,7 +9,7 @@ import { join } from "node:path";
 const DIR = join(process.cwd(), ".cache", "youcam");
 
 export function cacheEnabled(): boolean {
-  return process.env.NODE_ENV === "development" || process.env.YOUCAM_CACHE === "1";
+  return process.env.NODE_ENV !== "production" && (process.env.NODE_ENV === "development" || process.env.YOUCAM_CACHE === "1");
 }
 
 export function cacheKey(feature: string, inputs: Uint8Array[], params: unknown): string {

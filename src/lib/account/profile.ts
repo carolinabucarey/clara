@@ -54,7 +54,8 @@ export async function saveProfile(me: Me, prefs: { beauty: BeautyPrefs; goals: G
 
 export async function hasProfile(): Promise<boolean> {
   const { sb, uid } = await signedInClient();
-  const { count } = await sb.from("profiles").select("user_id", { count: "exact", head: true }).eq("user_id", uid);
+  const { count, error } = await sb.from("profiles").select("user_id", { count: "exact", head: true }).eq("user_id", uid);
+  if (error) throw new SaveError("generic");
   return (count ?? 0) > 0;
 }
 

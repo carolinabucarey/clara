@@ -78,10 +78,12 @@ status (`GET /s2s/{version}/task/{feature}/{task_id}`). The API key lives only o
 4. **Admits what it doesn't know.** Borderline values, poor light, arms close to the body or loose clothes
    lower the confidence, widen the ranges and are explained; YouCam errors become "retake the photo like this".
 5. **Rescues instead of forbidding.** A different lipstick, the color away from the face, a belt.
-6. **Cares for the photos.** Without an account, images are processed in memory and forwarded to YouCam
-   only; Clara stores nothing. With an account, Clara keeps only what the person saves (looks, and the
+6. **Cares for the photos.** In production, unsaved images are processed in memory. YouCam receives the
+   photos needed for each feature; Claude receives the garment image for attribute reading and measured
+   profile data for the explanation. With an account, Clara keeps only what the person saves (looks, and the
    profile photos only after an explicit opt-in) in a private folder protected by row-level security, and
-   "Delete my photos and looks" or "Delete my account" removes it. YouCam keeps processed results for 24 hours.
+   "Delete my photos and looks" or "Delete my account" removes it. Provider retention is governed by each
+   provider's policy. Local development caches YouCam results in `.cache/youcam` to save API units; use test images.
 
 ## Architecture
 
@@ -111,10 +113,10 @@ Browser (Next.js client)                 Server (Next.js route handlers)        
 
 ## Run it locally
 
-Requirements: Node.js 20+.
+Requirements: Node.js 22.12+ (the test runner needs it). `nvm use` selects the project's Node 22 release.
 
 ```bash
-npm install
+npm ci
 cp .env.example .env.local   # then fill in the keys
 npm run dev
 ```
@@ -124,7 +126,7 @@ npm run dev
 | `YOUCAM_API_KEY` | yes | YouCam API console → API keys (V2, sent as `Bearer`) |
 | `ANTHROPIC_API_KEY` | recommended | Garment reading and verdict text. Without it Clara uses manual chips and template text. |
 | `YOUCAM_API_BASE` | no | Defaults to `https://yce-api-01.makeupar.com` |
-| `YOUCAM_CACHE` | no | `1` caches YouCam results on disk (always on in `next dev`) to save API units |
+| `YOUCAM_CACHE` | no | `1` caches YouCam results on disk outside production (always on in `next dev`) to save API units. Production always disables this cache. |
 | `NEXT_PUBLIC_SUPABASE_URL` | for accounts | Supabase project URL. Without the Supabase variables Clara has no accounts and stores nothing. |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | for accounts | Public key (`sb_publishable_…`; a legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` also works); RLS protects the data |
 | `SUPABASE_SERVICE_ROLE_KEY` | for accounts | Server only, used by `DELETE /api/account` to delete the auth user |
@@ -148,8 +150,15 @@ npm run dev
 ```bash
 npm test          # vitest: color math, profile, proportions, rules, language validator, i18n coverage
 npm run lint
+npm run typecheck # generates Next.js route types, then checks TypeScript
 npm run build
+npm run validate  # all four checks, also run by GitHub Actions
 ```
+
+The suite also covers request size/format limits, signed image URLs, rejected non-image responses,
+task start/polling and the clothes-engine fallback, manual/template mode without Claude, and complete
+private-file deletion across storage pages. API integration tests mock providers and do not spend units.
+See [the audit report](docs/code-audit.md) for the verification scope and remaining limits.
 
 ### Deploy (Vercel)
 
@@ -169,6 +178,10 @@ one-tap examples on the first screen.
 - Seasonal color analysis is debatable; Clara bases its color advice on measured undertone and contrast and
   presents it as style advice.
 - The try-on image can alter details of the face or body; the verdict relies on measurements, not on the generated image.
+- Paid anonymous routes check browser origin and limit each IP to 30 requests per minute per route group,
+  per server instance. This is a demo safeguard; a larger public launch needs a shared quota/rate limiter.
+- The image proxy only fetches signed task-result URLs, refuses redirects and non-raster content, and bounds
+  response size and time. Links remain bearer capabilities until the provider expires the original image.
 - An outfit is built by chaining one-category try-ons, so each extra piece is another generation step.
 - On the full-body photo, the makeup goes through a crop that is enlarged and pasted back, so the face looks
   softer than in the selfie portrait.

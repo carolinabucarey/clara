@@ -59,38 +59,44 @@ export function LookStep({
 }) {
   const { t, ev, rs } = useI18n();
   const [busy, setBusy] = useState(false);
-  const started = useRef<string | null>(null);
+  const request = useRef<AbortController | null>(null);
 
   const order = wearOrder(look.pieces);
   const pieceOf = (s: Slot) => trials[look.pieces[s]!];
   const multi = order.length > 1;
   const key = outfitKey(look.pieces, trials, me.bodyUrl);
   const outfitUrl = multi ? (look.outfitKey === key ? look.outfitUrl : undefined) : pieceOf(order[0]).tryOnUrl;
-  const outfitError = multi && look.outfitKey === key ? look.outfitError : undefined;
+  const outfitError = multi ? (look.outfitKey === key ? look.outfitError : undefined) : pieceOf(order[0]).tryOnError;
 
   const runOutfit = async () => {
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
+    const { signal } = controller;
     setBusy(true);
     onUpdateLook({ outfitError: undefined });
     try {
       const plan = outfitPlan(look.pieces, trials);
       const step = (s: Slot) => ({ garment: pieceOf(s).garment.upload, category: pieceOf(s).garment.attrs.category });
-      const url = await tryOnOutfit(me.bodyBlob, plan.baseUrl, plan.steps.map(step), undefined, order.map(step));
+      const url = await tryOnOutfit(me.bodyBlob, plan.baseUrl, plan.steps.map(step), signal, order.map(step));
+      if (signal.aborted) return;
       onUpdateLook({ outfitUrl: url, outfitKey: key, outfitFidelityWarning: undefined });
       checkTryOnFidelity(me.bodyUrl, url)
-        .then((issues) => onUpdateLook({ outfitFidelityWarning: issues.length > 0 }))
+        .then((issues) => { if (!signal.aborted) onUpdateLook({ outfitFidelityWarning: issues.length > 0 }); })
         .catch(() => undefined);
     } catch (e) {
-      onUpdateLook({ outfitError: errorCode(e), outfitKey: key, outfitUrl: undefined });
+      if (!signal.aborted) onUpdateLook({ outfitError: errorCode(e), outfitKey: key, outfitUrl: undefined });
     } finally {
-      setBusy(false);
+      if (!signal.aborted) setBusy(false);
     }
   };
 
   // The outfit is tried on once per combination of pieces and body photo.
   useEffect(() => {
-    if (!multi || look.outfitKey === key || started.current === key) return;
-    started.current = key;
-    void runOutfit();
+    const timer = setTimeout(() => {
+      if (multi && look.outfitKey !== key) void runOutfit();
+    }, 0);
+    return () => { clearTimeout(timer); request.current?.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, multi]);
 
@@ -122,7 +128,7 @@ export function LookStep({
               <div className="flex aspect-[3/4] w-full flex-col items-center justify-center gap-3 rounded-2xl bg-cream p-4 text-center">
                 <p className="text-sm text-muted">{t("look.tryOnFailed")}</p>
                 <p className="text-xs text-muted">{t(`errors.${outfitError}`)}</p>
-                <Button variant="secondary" onClick={runOutfit}>
+                <Button variant="secondary" onClick={multi ? runOutfit : () => onOpenPiece(look.pieces[order[0]]!)}>
                   {t("common.retry")}
                 </Button>
               </div>

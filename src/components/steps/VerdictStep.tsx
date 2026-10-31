@@ -94,7 +94,8 @@ export function VerdictStep({
   const [tryOnBusy, setTryOnBusy] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const [sharing, setSharing] = useState(false);
-  const started = useRef<string | null>(null);
+  const tryOnRequest = useRef<AbortController | null>(null);
+  const [shareError, setShareError] = useState(false);
 
   const local = useMemo(
     () => buildVerdict({ profile: me.profile, proportions: me.proportions, garment: g.attrs, garmentColor: g.color, goals }),
@@ -104,66 +105,76 @@ export function VerdictStep({
 
   // Try-on: once per garment + body photo.
   const runTryOn = async () => {
+    tryOnRequest.current?.abort();
+    const controller = new AbortController();
+    tryOnRequest.current = controller;
+    const { signal } = controller;
     setTryOnBusy(true);
     onUpdate({ tryOnError: undefined });
     try {
       let url: string | null = null;
       let over: string | undefined;
       if (tryOnBase) {
-        url = await tryOnOver(tryOnBase, g.upload, g.attrs.category).catch((e) => {
+        url = await tryOnOver(tryOnBase, g.upload, g.attrs.category, signal).catch((e) => {
           if (e instanceof FlowError && e.code === "baseExpired") return null;
           throw e;
         });
         if (url) over = tryOnBase;
       }
-      url ??= await tryOn(me.bodyBlob, g.upload, g.attrs.category);
+      url ??= await tryOn(me.bodyBlob, g.upload, g.attrs.category, signal);
+      if (signal.aborted) return;
       onUpdate({ tryOnUrl: url, tryOnOverUrl: over, fidelityWarning: undefined });
       // Local check, no API cost: did the try-on change the face beyond the garment?
       checkTryOnFidelity(me.bodyUrl, url)
-        .then((issues) => onUpdate({ fidelityWarning: issues.length > 0 }))
+        .then((issues) => { if (!signal.aborted) onUpdate({ fidelityWarning: issues.length > 0 }); })
         .catch(() => undefined);
     } catch (e) {
-      onUpdate({ tryOnError: errorCode(e) });
+      if (!signal.aborted) onUpdate({ tryOnError: errorCode(e) });
     } finally {
-      setTryOnBusy(false);
+      if (!signal.aborted) setTryOnBusy(false);
     }
   };
   const tryOnKey = `${g.id}:${me.bodyUrl}:${g.attrs.category}:${tryOnBase ?? ""}`;
   useEffect(() => {
-    if (trial.tryOnUrl || trial.tryOnError || started.current === tryOnKey) return;
-    started.current = tryOnKey;
-    void runTryOn();
+    // Defer the paid call until after React's development effect replay.
+    const timer = setTimeout(() => {
+      if (!trial.tryOnUrl && !trial.tryOnError) void runTryOn();
+    }, 0);
+    return () => { clearTimeout(timer); tryOnRequest.current?.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tryOnKey]);
 
   // Verdict text: whenever inputs or language change.
   const draftKey = JSON.stringify([locale, goals, me.profile, me.proportions, g.attrs, g.color.hex]);
-  const lastDraft = useRef<string | null>(null);
   useEffect(() => {
-    if (lastDraft.current === draftKey && trial.draft) return;
-    lastDraft.current = draftKey;
     let cancelled = false;
-     
-    setDrafting(true);
-    requestVerdict({
-      locale,
-      goals,
-      profile: me.profile,
-      proportions: me.proportions,
-      garment: g.attrs,
-      garmentColor: g.color,
-    })
-      .then(({ result, draft }) => {
-        if (!cancelled) onUpdate({ result, draft, draftLocale: locale });
+    const timer = setTimeout(() => {
+      if (trial.draftInputKey === draftKey && trial.draft) {
+        setDrafting(false);
+        return;
+      }
+      setDrafting(true);
+      requestVerdict({
+        locale,
+        goals,
+        profile: me.profile,
+        proportions: me.proportions,
+        garment: g.attrs,
+        garmentColor: g.color,
       })
-      .catch(() => {
-        if (!cancelled) onUpdate({ result: local });
-      })
-      .finally(() => {
-        if (!cancelled) setDrafting(false);
-      });
+        .then(({ result, draft }) => {
+          if (!cancelled) onUpdate({ result, draft, draftLocale: locale, draftInputKey: draftKey });
+        })
+        .catch(() => {
+          if (!cancelled) onUpdate({ result: local });
+        })
+        .finally(() => {
+          if (!cancelled) setDrafting(false);
+        });
+    }, 0);
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey]);
@@ -173,6 +184,7 @@ export function VerdictStep({
 
   const save = async () => {
     setSharing(true);
+    setShareError(false);
     try {
       const levels = {
         flatters: t("verdict.levels.flatters"),
@@ -199,6 +211,8 @@ export function VerdictStep({
         a.click();
         setTimeout(() => URL.revokeObjectURL(a.href), 2000);
       }
+    } catch {
+      setShareError(true);
     } finally {
       setSharing(false);
     }
@@ -262,6 +276,7 @@ export function VerdictStep({
       {draft?.uncertainty ? <Note>{draft.uncertainty}</Note> : low ? <Note>{t("verdict.lowConfidence")}</Note> : null}
       {draft?.source === "template" && <p className="text-xs text-muted">{t("verdict.templateNote")}</p>}
       {trial.tryOnError === "config" && <ErrorNote>{t("errors.config")}</ErrorNote>}
+      {shareError && <ErrorNote onRetry={save}>{t("errors.generic")}</ErrorNote>}
 
       <div className="flex flex-wrap justify-end gap-3">
         <Button variant="ghost" onClick={onAnother}>
@@ -280,7 +295,7 @@ export function VerdictStep({
             {t(`verdict.complement.${addSlot}`)}
           </Button>
         )}
-        <Button onClick={onLook}>{t("verdict.look")}</Button>
+        <Button onClick={onLook} disabled={tryOnBusy || (!trial.tryOnUrl && !trial.tryOnError)}>{t("verdict.look")}</Button>
       </div>
     </div>
   );

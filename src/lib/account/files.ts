@@ -6,16 +6,21 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export async function listUserFiles(client: SupabaseClient, bucket: string, userId: string): Promise<string[]> {
   const out: string[] = [];
   const walk = async (prefix: string, depth: number) => {
-    const { data, error } = await client.storage.from(bucket).list(prefix, { limit: 1000 });
-    if (error) throw error;
-    for (const item of data ?? []) {
-      const path = `${prefix}/${item.name}`;
-      // Folders come back without an id.
-      if (item.id === null) {
-        if (depth < 3) await walk(path, depth + 1);
-      } else {
-        out.push(path);
+    const limit = 1000;
+    for (let offset = 0; ; offset += limit) {
+      const { data, error } = await client.storage.from(bucket).list(prefix, { limit, offset, sortBy: { column: "name", order: "asc" } });
+      if (error) throw error;
+      for (const item of data ?? []) {
+        const path = `${prefix}/${item.name}`;
+        // Folders come back without an id.
+        if (item.id === null) {
+          if (depth >= 10) throw new Error("storage_folder_depth_exceeded");
+          await walk(path, depth + 1);
+        } else {
+          out.push(path);
+        }
       }
+      if (!data || data.length < limit) break;
     }
   };
   await walk(userId, 0);

@@ -7,32 +7,36 @@ import { cacheKey, readCache } from "@/lib/youcam/cache";
 import { createTask, uploadFile, YouCamError } from "@/lib/youcam/client";
 import { FEATURE_INPUTS, FEATURES, isFeature, PARAM_SCHEMAS, type Feature } from "@/lib/youcam/features";
 import { cachedResponse } from "@/lib/youcam/respond";
+import { HttpError, rateLimit, readForm, readImageFile, requireSameOrigin } from "@/lib/http";
 
 export const maxDuration = 60;
 
 const MAX_BYTES = 8 * 1024 * 1024;
-
-async function fileBytes(form: FormData, name: string) {
-  const value = form.get(name);
-  if (!value || typeof value === "string") return null;
-  if (value.size > MAX_BYTES) throw new YouCamError("exceed_max_filesize", "Image is larger than 8 MB", 413);
-  const type = value.type === "image/png" ? "image/png" : "image/jpeg";
-  return { bytes: new Uint8Array(await value.arrayBuffer()), type, name: type === "image/png" ? `${name}.png` : `${name}.jpg` };
-}
 
 export async function POST(req: NextRequest, ctx: RouteContext<"/api/youcam/[feature]">) {
   const { feature } = await ctx.params;
   if (!isFeature(feature)) return NextResponse.json({ error: "unknown_feature" }, { status: 404 });
 
   try {
-    const form = await req.formData();
-    const src = await fileBytes(form, "src");
-    const ref = FEATURE_INPUTS[feature].ref ? await fileBytes(form, "ref") : null;
+    requireSameOrigin(req);
+    rateLimit(req, "youcam");
+    const form = await readForm(req, MAX_BYTES * 2 + 64 * 1024);
+    const src = await readImageFile(form, "src", MAX_BYTES);
+    const ref = FEATURE_INPUTS[feature].ref ? await readImageFile(form, "ref", MAX_BYTES) : null;
     if (!src || (FEATURE_INPUTS[feature].ref && !ref)) {
       return NextResponse.json({ error: "missing_image" }, { status: 400 });
     }
     const rawParams = form.get("params");
-    const parsed = PARAM_SCHEMAS[feature].safeParse(rawParams ? JSON.parse(String(rawParams)) : {});
+    let decoded: unknown = {};
+    try {
+      if (rawParams) {
+        if (typeof rawParams !== "string" || rawParams.length > 16 * 1024) throw new Error("invalid_params");
+        decoded = JSON.parse(rawParams);
+      }
+    } catch {
+      return NextResponse.json({ error: "invalid_parameter" }, { status: 400 });
+    }
+    const parsed = PARAM_SCHEMAS[feature].safeParse(decoded);
     if (!parsed.success) {
       return NextResponse.json({ error: "invalid_parameter", detail: parsed.error.issues }, { status: 400 });
     }
@@ -63,6 +67,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/youcam/[fea
     }
     return NextResponse.json({ status: "running", feature: used, taskId, key });
   } catch (err) {
+    if (err instanceof HttpError) return NextResponse.json({ error: err.code }, { status: err.status });
     const e = err instanceof YouCamError ? err : new YouCamError("unknown_internal_error", (err as Error).message);
     console.error(`[youcam:${feature}]`, e.code, e.message);
     return NextResponse.json({ status: "error", code: e.code }, { status: e.httpStatus >= 400 ? e.httpStatus : 500 });

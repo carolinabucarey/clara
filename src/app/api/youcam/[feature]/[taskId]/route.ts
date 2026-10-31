@@ -5,6 +5,7 @@ import { describeShape, getTask, resultImageUrl, YouCamError } from "@/lib/youca
 import { cacheEnabled, writeCache } from "@/lib/youcam/cache";
 import { isFeature } from "@/lib/youcam/features";
 import { proxiedUrl } from "@/lib/youcam/respond";
+import { fetchResultImage } from "@/lib/youcam/result-image";
 
 export async function GET(req: NextRequest, ctx: RouteContext<"/api/youcam/[feature]/[taskId]">) {
   const { feature, taskId } = await ctx.params;
@@ -20,14 +21,16 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/youcam/[feat
 
     const remote = resultImageUrl(state.results);
     let imageUrl: string | null = remote ? proxiedUrl(remote) : null;
-    if (cacheEnabled() && key) {
-      let bytes: Uint8Array | null = null;
-      if (remote) {
-        const res = await fetch(remote);
-        if (res.ok) bytes = new Uint8Array(await res.arrayBuffer());
+    if (cacheEnabled() && /^[a-f0-9]{40}$/.test(key)) {
+      // A development cache failure must never discard a successful paid result.
+      try {
+        let bytes: Uint8Array | null = null;
+        if (remote) bytes = (await fetchResultImage(remote)).bytes;
+        await writeCache(key, state.results, bytes);
+        if (bytes) imageUrl = `/api/youcam/image?cached=${key}`;
+      } catch {
+        console.warn(`[youcam:${feature}] development cache unavailable`);
       }
-      await writeCache(key, state.results, bytes);
-      if (bytes) imageUrl = `/api/youcam/image?cached=${key}`;
     }
     return NextResponse.json({ status: "success", feature, results: state.results, imageUrl });
   } catch (err) {

@@ -17,7 +17,10 @@ let hairPromise: Promise<ImageSegmenter> | null = null;
 
 async function fileset() {
   const { FilesetResolver } = await import("@mediapipe/tasks-vision");
-  filesetPromise ??= FilesetResolver.forVisionTasks(WASM_PATH);
+  filesetPromise ??= FilesetResolver.forVisionTasks(WASM_PATH).catch((err) => {
+    filesetPromise = null;
+    throw err;
+  });
   return filesetPromise as ReturnType<typeof FilesetResolver.forVisionTasks>;
 }
 
@@ -37,7 +40,10 @@ async function poseLandmarker(): Promise<PoseLandmarker> {
     } catch {
       return await create("CPU");
     }
-  })();
+  })().catch((err) => {
+    posePromise = null;
+    throw err;
+  });
   return posePromise;
 }
 
@@ -56,7 +62,10 @@ async function faceDetector(): Promise<FaceDetector> {
     } catch {
       return await create("CPU");
     }
-  })();
+  })().catch((err) => {
+    facePromise = null;
+    throw err;
+  });
   return facePromise;
 }
 

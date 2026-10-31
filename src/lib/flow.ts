@@ -38,6 +38,7 @@ export class FlowError extends Error {
 
 /** i18n key (under `errors`) for any error thrown by the flow. */
 export function errorCode(err: unknown): string {
+  if (err instanceof DOMException && err.name === "TimeoutError") return "timeout";
   if (err instanceof YouCamTaskError) return errorKey(err.code);
   if (err instanceof FlowError || err instanceof PoseMeasurementError) return err.code;
   return "generic";
@@ -137,7 +138,7 @@ export async function analyzeGarment(file: Blob, onStage?: (s: "reading" | "isol
   if (measured.clusters.length === 0) throw new FlowError("imageUnreadable");
   const top = measured.clusters[0];
   return {
-    id: `${Date.now()}`,
+    id: crypto.randomUUID(),
     originalUrl,
     upload: full.blob,
     isolatedUrl,
@@ -278,7 +279,6 @@ export async function tryOnOutfit(
     } catch (e) {
       if (!(e instanceof FlowError && e.code === "baseExpired")) throw e;
       return tryOnOutfit(body, null, allSteps, signal); // start again from the body photo
-
     }
   }
   for (const s of steps) {

@@ -54,7 +54,7 @@ const BANNED: Record<Locale, RegExp[]> = {
   ],
 };
 
-export function violations(locale: Locale, draft: z.infer<typeof DraftSchema>): string[] {
+export function violations(_locale: Locale, draft: z.infer<typeof DraftSchema>): string[] {
   const texts = [
     draft.cut.headline,
     draft.cut.body,
@@ -65,7 +65,7 @@ export function violations(locale: Locale, draft: z.infer<typeof DraftSchema>): 
     draft.uncertainty ?? "",
   ];
   const found: string[] = [];
-  for (const re of [...BANNED.en, ...BANNED[locale]]) {
+  for (const re of [...BANNED.en, ...BANNED.es]) {
     if (texts.some((t) => re.test(t))) found.push(re.source);
   }
   if (!draft.cut.body.trim() || !draft.color.body.trim()) found.push("empty");

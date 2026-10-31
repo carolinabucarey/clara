@@ -73,3 +73,15 @@ body {
   background-size: 200% 100%;
   animation: shimmer 1.6s linear infinite;
 }
+
+button:focus-visible, input:focus-visible, a:focus-visible {
+  outline: 2px solid var(--clay);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}

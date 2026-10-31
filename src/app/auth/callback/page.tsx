@@ -15,14 +15,17 @@ export default function AuthCallback() {
   const [state, setState] = useState<"working" | "done" | "failed">("working");
 
   useEffect(() => {
+    let alive = true;
     const sb = supabase();
     if (!sb) {
       window.location.replace("/");
       return;
     }
     sb.auth.getSession().then(({ data }) => {
+      if (!alive) return;
       setState(data.session ? "done" : "failed");
-    });
+    }).catch(() => { if (alive) setState("failed"); });
+    return () => { alive = false; };
   }, []);
 
   return (

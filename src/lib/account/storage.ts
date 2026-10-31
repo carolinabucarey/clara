@@ -51,12 +51,16 @@ export async function downloadImage(path: string): Promise<Blob> {
 export async function signedUrls(paths: string[]): Promise<Record<string, string>> {
   const sb = supabase();
   if (!sb || paths.length === 0) return {};
-  const { data } = await sb.storage.from(BUCKET).createSignedUrls(paths, 3600);
+  const { data, error } = await sb.storage.from(BUCKET).createSignedUrls(paths, 3600);
+  if (error) throw new SaveError("generic");
   return Object.fromEntries((data ?? []).filter((d) => d.signedUrl && d.path).map((d) => [d.path!, d.signedUrl!]));
 }
 
 export async function removeImages(paths: string[]) {
   const sb = supabase();
-  if (!sb || paths.length === 0) return;
-  await sb.storage.from(BUCKET).remove(paths);
+  if (!sb) throw new SaveError("disabled");
+  for (let i = 0; i < paths.length; i += 100) {
+    const { error } = await sb.storage.from(BUCKET).remove(paths.slice(i, i + 100));
+    if (error) throw new SaveError("generic");
+  }
 }

@@ -2,13 +2,15 @@
   "name": "clara",
   "version": "0.1.0",
   "private": true,
+  "engines": { "node": ">=22.12.0" },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint --max-warnings=0",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
+    "validate": "npm run lint && npm run typecheck && npm test && npm run build",
     "postinstall": "node scripts/copy-mediapipe.mjs"
   },
   "dependencies": {
