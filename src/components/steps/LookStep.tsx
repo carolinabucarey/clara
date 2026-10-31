@@ -21,6 +21,7 @@ import {
   Swatch,
   VerdictPill,
 } from "../ui";
+import { ZoomableImage } from "../ZoomableImage";
 
 /** Pieces nearest the face first: the makeup plays along with those colors. */
 const FACE_FIRST: Slot[] = ["top", "full", "outer", "bottom"];
@@ -122,8 +123,7 @@ export function LookStep({
         <div className="grid gap-4 sm:grid-cols-2">
           <figure>
             {outfitUrl && !busy ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={outfitUrl} alt="" className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
+              <ZoomableImage src={outfitUrl} className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
             ) : outfitError ? (
               <div className="flex aspect-[3/4] w-full flex-col items-center justify-center gap-3 rounded-2xl bg-cream p-4 text-center">
                 <p className="text-sm text-muted">{t("look.tryOnFailed")}</p>

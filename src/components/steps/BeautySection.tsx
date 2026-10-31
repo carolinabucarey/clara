@@ -9,6 +9,7 @@ import { useHairTemplates } from "@/lib/beauty/templates";
 import type { BeautyPrefs, HairStyleGroup } from "@/lib/types";
 import type { Look, Me } from "../ClaraApp";
 import { Button, Card, ChipSelect, cx, ErrorNote, EvidenceList, Note, SkeletonImage, Spinner, VerdictPill } from "../ui";
+import { ZoomableImage } from "../ZoomableImage";
 
 function HairTile({
   label,
@@ -315,8 +316,7 @@ export function BeautySection({
           {(fullBusy || fullUrl) && (
             <figure className="mx-auto w-full max-w-sm">
               {fullUrl && !fullBusy ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={fullUrl} alt="" className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
+                <ZoomableImage src={fullUrl} className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
               ) : (
                 <SkeletonImage label={t("beauty.fullTrying")} />
               )}
