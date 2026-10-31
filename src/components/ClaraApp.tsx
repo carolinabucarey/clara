@@ -7,7 +7,8 @@ import type { GarmentAnalysis } from "@/lib/flow";
 import { missingSlots, outfitKey, placePiece, removePiece, tryOnBaseFor, wearOrder } from "@/lib/look";
 import { deleteAccount, signOut, useAccount } from "@/lib/account/session";
 import { deleteAllData, hasProfile, loadProfile, saveProfile } from "@/lib/account/profile";
-import { saveLook, type SavedHairstyle } from "@/lib/account/looks";
+import { openSavedLook, saveLook, type SavedHairstyle, type SavedLook } from "@/lib/account/looks";
+import { makeupEffects } from "@/lib/beauty/makeup";
 import { SaveError } from "@/lib/account/storage";
 import { evaluateOutfit } from "@/lib/verdict/outfit";
 import { slotFor } from "@/lib/types";
@@ -87,10 +88,18 @@ export interface Look {
   faceUrl?: string;
   faceKey?: string;
   faceError?: string;
-  /** What the portrait in faceUrl was made with, to save it alongside. */
+  /** Hair and makeup on the full-body outfit photo (lib/flow applyLookOnBody). */
+  fullUrl?: string;
+  fullKey?: string;
+  fullError?: string;
+  /** What the latest portrait or full look was made with, to save it alongside. */
   faceMakeup?: MakeupStep[];
   faceHair?: SavedHairstyle | null;
+  /** The account copy this look updates when saved again. */
+  saved?: SavedLook;
 }
+
+const MAKEUP_CATEGORIES: MakeupCategory[] = ["blush", "eye_shadow", "eye_liner", "lip_color"];
 
 const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -108,7 +117,7 @@ const STALE_TRY_ON: Partial<Trial> = {
 const STEPS: Array<Exclude<Step, "compare" | "looks">> = ["garment", "photos", "profile", "verdict", "look"];
 
 /** Identifies what a save captured, so "Saved" turns back into "Save look" after a change. */
-const lookSignature = (l: Look) => JSON.stringify([l.pieces, l.outfitKey, l.faceKey]);
+const lookSignature = (l: Look) => JSON.stringify([l.pieces, l.outfitKey, l.faceKey, l.fullKey]);
 
 export function ClaraApp() {
   const { t, locale, setLocale } = useI18n();
@@ -169,6 +178,7 @@ export function ClaraApp() {
 
   const doSave = async (withProfile: boolean) => {
     if (!look || !me) return;
+    const index = lookIndex;
     const signature = lookSignature(look);
     setSave({ signature, status: "saving" });
     try {
@@ -185,14 +195,20 @@ export function ClaraApp() {
         me.proportions,
         goals,
       );
-      await saveLook({
-        pieces: order.map((slot) => ({ slot, trial: pieceOf(slot) })),
-        outfitUrl,
-        outfit,
-        faceUrl: look.faceUrl ?? null,
-        makeup: look.faceUrl ? (look.faceMakeup ?? null) : null,
-        hairstyle: look.faceUrl ? (look.faceHair ?? null) : null,
-      });
+      const styled = !!(look.faceUrl || look.fullUrl);
+      const saved = await saveLook(
+        {
+          pieces: order.map((slot) => ({ slot, trial: pieceOf(slot) })),
+          outfitUrl,
+          outfit,
+          faceUrl: look.faceUrl ?? null,
+          fullUrl: look.fullUrl ?? null,
+          makeup: styled ? (look.faceMakeup ?? null) : null,
+          hairstyle: styled ? (look.faceHair ?? null) : null,
+        },
+        look.saved,
+      );
+      updateLook({ saved }, index);
       // With consent the first time; afterwards the account profile simply stays current.
       if (withProfile || profileSync.saved) {
         await saveProfile(me, { beauty, goals }, profileSync.selfieUrl !== me.selfieUrl);
@@ -246,6 +262,45 @@ export function ClaraApp() {
 
   const account = useAccount((user) => onUserChange(user?.id ?? null));
 
+  /** Brings a saved look back into the session to change it; saving again updates it. */
+  const editSavedLook = async (saved: SavedLook) => {
+    if (!me) {
+      setNotice(t("looks.needPhotos"));
+      return;
+    }
+    const loaded = await openSavedLook(saved);
+    const offset = trials.length;
+    const pieces: Look["pieces"] = Object.fromEntries(loaded.slots.map((s, i) => [s, offset + i]));
+    const all = [...trials, ...loaded.trials];
+    // Keys as the look and beauty sections compute them, so the saved images count as current.
+    const templateId = saved.hairstyle?.templateId ?? null;
+    const effects = JSON.stringify(makeupEffects(saved.makeup ?? []));
+    const styled = !!(saved.facePath || saved.fullPath);
+    const outfitShown = loaded.slots.length > 1 ? loaded.outfitUrl : loaded.trials[0]?.tryOnUrl;
+    setTrials(all);
+    setLooks((ls) => [
+      ...ls,
+      {
+        id: newId(),
+        pieces,
+        saved,
+        outfitUrl: loaded.outfitUrl,
+        outfitKey: loaded.outfitUrl ? outfitKey(pieces, all, me.bodyUrl) : undefined,
+        hairTemplateId: styled ? templateId : undefined,
+        makeupOff: saved.makeup ? MAKEUP_CATEGORIES.filter((c) => !saved.makeup!.some((m) => m.category === c)) : undefined,
+        faceUrl: loaded.faceUrl,
+        faceKey: loaded.faceUrl ? `${me.selfieWideUrl}|${templateId ?? ""}|${effects}` : undefined,
+        fullUrl: loaded.fullUrl,
+        fullKey: loaded.fullUrl && outfitShown ? `${outfitShown}|${templateId ?? ""}|${effects}` : undefined,
+        faceMakeup: saved.makeup ?? undefined,
+        faceHair: saved.hairstyle,
+      },
+    ]);
+    setCurrent(offset);
+    setBack(null);
+    setStep("look");
+  };
+
   const onDeleteData = async () => {
     if (!window.confirm(t("account.confirmDeleteData"))) return;
     try {
@@ -287,7 +342,13 @@ export function ClaraApp() {
         </label>
       )}
       <Button onClick={onSaveLook} disabled={saveStatus === "saving" || saveStatus === "saved"}>
-        {saveStatus === "saved" ? `✓ ${t("look.saved")}` : saveStatus === "saving" ? t("look.saving") : t("look.save")}
+        {saveStatus === "saved"
+          ? `✓ ${t("look.saved")}`
+          : saveStatus === "saving"
+            ? t("look.saving")
+            : look.saved
+              ? t("look.saveChanges")
+              : t("look.save")}
       </Button>
       {saveStatus === "error" && (
         <div className="basis-full">
@@ -533,6 +594,8 @@ export function ClaraApp() {
         )}
         {step === "looks" && account.user && (
           <MyLooksStep
+            canEdit={!!me}
+            onEdit={editSavedLook}
             onBack={() => {
               if (back) {
                 setCurrent(back.current);

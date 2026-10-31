@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
-import { applyHairstyle, applyMakeupLook, errorCode } from "@/lib/flow";
+import { applyHairstyle, applyLookOnBody, applyMakeupLook, errorCode } from "@/lib/flow";
 import { makeupEffects, makeupFor } from "@/lib/beauty/makeup";
 import { suggestHairstyles, templatesFor } from "@/lib/beauty/hairstyles";
 import { useHairTemplates } from "@/lib/beauty/templates";
@@ -44,12 +44,15 @@ export function BeautySection({
   beauty,
   onBeauty,
   outfitHexes,
+  outfitUrl,
   onUpdateLook,
 }: {
   me: Me;
   look: Look;
   beauty: BeautyPrefs;
   onBeauty: (b: BeautyPrefs) => void;
+  /** The outfit try-on, to put the whole look on the full-body photo. */
+  outfitUrl?: string;
   /** Colors of the pieces nearest the face first, for the makeup to play along with. */
   outfitHexes: string[];
   onUpdateLook: (patch: Partial<Look>) => void;
@@ -58,6 +61,7 @@ export function BeautySection({
   const { templates, failed } = useHairTemplates();
   const [showAll, setShowAll] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [fullBusy, setFullBusy] = useState(false);
   const faceShape = me.faceShape?.shape ?? null;
 
   const suggestions = useMemo(
@@ -82,6 +86,13 @@ export function BeautySection({
   const faceError = look.faceKey === faceKey ? look.faceError : undefined;
   const stale = !!look.faceUrl && look.faceKey !== faceKey;
   const canTry = !!chosen || effects.length > 0;
+  const fullKey = outfitUrl ? `${outfitUrl}|${chosen ?? ""}|${JSON.stringify(effects)}` : null;
+  const fullUrl = fullKey && look.fullKey === fullKey ? look.fullUrl : undefined;
+  const fullError = fullKey && look.fullKey === fullKey ? look.fullError : undefined;
+  const used = () => ({
+    faceMakeup: kept,
+    faceHair: chosen ? { templateId: chosen, title: titleOf(chosen), code: chosenSuggestion?.code, params: chosenSuggestion?.params } : null,
+  });
 
   const run = async () => {
     setBusy(true);
@@ -93,16 +104,25 @@ export function BeautySection({
         onUpdateLook({ hairUrl, hairKey: hairKey! });
       }
       const url = effects.length > 0 ? await applyMakeupLook(effects, chosen ? hairUrl! : null, me.selfieWideBlob) : hairUrl!;
-      onUpdateLook({
-        faceUrl: url,
-        faceKey,
-        faceMakeup: kept,
-        faceHair: chosen ? { templateId: chosen, title: titleOf(chosen), code: chosenSuggestion?.code, params: chosenSuggestion?.params } : null,
-      });
+      onUpdateLook({ faceUrl: url, faceKey, ...used() });
     } catch (e) {
       onUpdateLook({ faceError: errorCode(e), faceKey });
     } finally {
       setBusy(false);
+    }
+  };
+
+  const runFull = async () => {
+    if (!outfitUrl || !fullKey) return;
+    setFullBusy(true);
+    onUpdateLook({ fullUrl: undefined, fullError: undefined, fullKey });
+    try {
+      const url = await applyLookOnBody(outfitUrl, chosen, effects);
+      onUpdateLook({ fullUrl: url, fullKey, ...used() });
+    } catch (e) {
+      onUpdateLook({ fullError: errorCode(e), fullKey });
+    } finally {
+      setFullBusy(false);
     }
   };
 
@@ -263,6 +283,34 @@ export function BeautySection({
           </div>
         )}
       </div>
+
+      {/* The whole look on the full-body outfit photo */}
+      {outfitUrl && canTry && (
+        <div className="space-y-3 border-t border-line pt-4">
+          <div>
+            <h3 className="text-sm font-semibold text-ink">{t("beauty.fullTitle")}</h3>
+            <p className="text-xs text-muted">{t("beauty.fullNote")}</p>
+          </div>
+          {(fullBusy || fullUrl) && (
+            <figure className="mx-auto w-full max-w-sm">
+              {fullUrl && !fullBusy ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={fullUrl} alt="" className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
+              ) : (
+                <SkeletonImage label={t("beauty.fullTrying")} />
+              )}
+            </figure>
+          )}
+          {fullError && !fullBusy && <ErrorNote onRetry={runFull}>{t(`errors.${fullError}`)}</ErrorNote>}
+          {!fullUrl && !fullBusy && (
+            <div className="flex justify-end">
+              <Button variant={faceUrl ? "primary" : "secondary"} onClick={runFull}>
+                {t("beauty.fullTry")}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
     </Card>
   );
 }

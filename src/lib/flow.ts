@@ -8,7 +8,7 @@ import { DEFAULT_ATTRIBUTES } from "./garment/defaults";
 import { dominantColors, looksMulticolor } from "./color/dominant";
 import { flattenOnto, recolorPixels } from "./color/recolor";
 import { describeGarmentColor } from "./color/garment";
-import { faceCrop, getPixels, loadImage, prepareUpload, toCanvas, type Rect } from "./image";
+import { canvasToBlob, faceCrop, getPixels, loadImage, prepareUpload, toCanvas, type Rect } from "./image";
 import { measureBody, PoseMeasurementError, LM, type Landmark } from "./pose/measure";
 import { detectFaces, detectPose } from "./pose/vision";
 import { fidelityIssues, meanDeltaE, type FidelityIssue } from "./pose/fidelity";
@@ -55,6 +55,8 @@ export interface GarmentAnalysis {
   attrs: GarmentAttributes;
   isGarment: boolean;
   attrsSource: "claude" | "default";
+  /** The store page it came from, when it was added from a link. */
+  source?: { url: string; title: string | null };
 }
 
 async function readAttributes(blob: Blob) {
@@ -298,6 +300,90 @@ export async function applyMakeupLook(effects: MakeupEffect[], baseUrl: string |
   const res = await runYouCam(FEATURES.makeup, { src, params: { effects, version: "1.0" } });
   if (!res.imageUrl) throw new FlowError("generic");
   return res.imageUrl;
+}
+
+/**
+ * Head and shoulders in a full-body photo. The short-range face detector often misses
+ * a face that small, so the pose landmarks (nose, eyes, ears) are the fallback.
+ */
+async function headBox(canvas: HTMLCanvasElement): Promise<Rect | null> {
+  const faces = await detectFaces(canvas);
+  if (faces[0]) return faces[0];
+  const pose = await detectPose(canvas);
+  const pts = (pose?.landmarks.slice(0, 9) ?? []).filter((p) => (p.visibility ?? 1) > 0.3);
+  if (pts.length < 3) return null;
+  const xs = pts.map((p) => p.x * canvas.width);
+  const nose = pose!.landmarks[LM.nose];
+  const width = Math.max(...xs) - Math.min(...xs);
+  const height = width * 1.3;
+  return { x: (Math.max(...xs) + Math.min(...xs)) / 2 - width / 2, y: nose.y * canvas.height - height * 0.55, width, height };
+}
+
+/** Taller than the selfie crop, so long hair fits before the edges fade back to the photo. */
+function lookCrop(face: Rect, imgW: number, imgH: number): Rect {
+  const width = Math.min(imgW, face.width * 3.6);
+  const height = Math.min(imgH, width * 1.6);
+  const x = Math.max(0, Math.min(imgW - width, face.x + face.width / 2 - width / 2));
+  const y = Math.max(0, Math.min(imgH - height, face.y - face.height * 0.9));
+  return { x, y, width, height };
+}
+
+/** A crop scaled so its long side is exactly `longSide` (enlarging it if needed). */
+function cropScaled(canvas: HTMLCanvasElement, r: Rect, longSide: number): HTMLCanvasElement {
+  const s = longSide / Math.max(r.width, r.height);
+  const out = document.createElement("canvas");
+  out.width = Math.round(r.width * s);
+  out.height = Math.round(r.height * s);
+  const ctx = out.getContext("2d")!;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(canvas, r.x, r.y, r.width, r.height, 0, 0, out.width, out.height);
+  return out;
+}
+
+/** Puts the edited head back into the photo: fully replaced in the middle, fading out near the edges. */
+function pasteFeathered(target: HTMLCanvasElement, patch: HTMLImageElement, r: Rect, feather = 0.14) {
+  const w = Math.round(r.width);
+  const h = Math.round(r.height);
+  const tmp = document.createElement("canvas");
+  tmp.width = w;
+  tmp.height = h;
+  const ctx = tmp.getContext("2d")!;
+  ctx.drawImage(patch, 0, 0, w, h);
+  ctx.globalCompositeOperation = "destination-in";
+  for (const [x1, y1] of [
+    [w, 0],
+    [0, h],
+  ]) {
+    const g = ctx.createLinearGradient(0, 0, x1, y1);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(feather, "rgba(0,0,0,1)");
+    g.addColorStop(1 - feather, "rgba(0,0,0,1)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  }
+  target.getContext("2d")!.drawImage(tmp, Math.round(r.x), Math.round(r.y));
+}
+
+/**
+ * The whole look in one picture: the face in a full-body photo is too small for
+ * YouCam's hairstyle and makeup try-ons, so the head and shoulders are cropped,
+ * enlarged, styled, and pasted back into the outfit photo.
+ */
+export async function applyLookOnBody(outfitUrl: string, templateId: string | null, effects: MakeupEffect[]) {
+  const img = await loadImage(outfitUrl).catch(() => {
+    throw new FlowError("baseExpired");
+  });
+  const full = toCanvas(img, 2400);
+  const head = await headBox(full);
+  if (!head) throw new FlowError("no_face_local");
+  const rect = lookCrop(head, full.width, full.height);
+  const crop = await canvasToBlob(cropScaled(full, rect, 1024));
+  let url: string | null = templateId ? await applyHairstyle(crop, templateId) : null;
+  if (effects.length > 0) url = await applyMakeupLook(effects, url, crop);
+  if (!url) throw new FlowError("generic");
+  pasteFeathered(full, await loadImage(url), rect);
+  return URL.createObjectURL(await canvasToBlob(full));
 }
 
 /** Compares the face before and after the try-on (local, no API cost). */

@@ -11,7 +11,14 @@ function LookDetail({ look, urls }: { look: SavedLook; urls: Record<string, stri
   return (
     <div className="space-y-4 border-t border-line pt-4">
       <div className="grid grid-cols-2 gap-3">
-        {look.outfitPath && urls[look.outfitPath] && (
+        {look.fullPath && urls[look.fullPath] && (
+          <figure>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={urls[look.fullPath]} alt="" className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
+            <figcaption className="mt-1.5 text-center text-xs text-muted">{t("looks.full")}</figcaption>
+          </figure>
+        )}
+        {!look.fullPath && look.outfitPath && urls[look.outfitPath] && (
           <figure>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={urls[look.outfitPath]} alt="" className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
@@ -42,6 +49,11 @@ function LookDetail({ look, urls }: { look: SavedLook; urls: Record<string, stri
                 </div>
               )}
               {p.draft && p.draftLocale === locale && <p className="text-xs text-ink/80">{p.draft.cut.headline}</p>}
+              {p.source && (
+                <a href={p.source.url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-clay underline-offset-4 hover:underline">
+                  {t("look.store")}
+                </a>
+              )}
             </div>
           </li>
         ))}
@@ -77,12 +89,22 @@ function LookDetail({ look, urls }: { look: SavedLook; urls: Record<string, stri
 }
 
 /** The looks saved in the person's account. */
-export function MyLooksStep({ onBack }: { onBack: () => void }) {
+export function MyLooksStep({
+  canEdit,
+  onEdit,
+  onBack,
+}: {
+  /** Editing needs the person's photos (restored from the account or taken this session). */
+  canEdit: boolean;
+  onEdit: (look: SavedLook) => Promise<void>;
+  onBack: () => void;
+}) {
   const { t, locale } = useI18n();
   const [looks, setLooks] = useState<SavedLook[] | null>(null);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  const [opening, setOpening] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -98,6 +120,16 @@ export function MyLooksStep({ onBack }: { onBack: () => void }) {
       alive = false;
     };
   }, []);
+
+  const edit = async (look: SavedLook) => {
+    setOpening(look.id);
+    try {
+      await onEdit(look);
+    } catch {
+      setFailed(true);
+      setOpening(null);
+    }
+  };
 
   const remove = async (look: SavedLook) => {
     if (!window.confirm(t("looks.confirmDelete"))) return;
@@ -116,7 +148,7 @@ export function MyLooksStep({ onBack }: { onBack: () => void }) {
       {failed && <ErrorNote>{t("account.errors.generic")}</ErrorNote>}
       {looks?.length === 0 && <Note>{t("looks.empty")}</Note>}
       {looks?.map((look) => {
-        const cover = look.outfitPath ?? look.pieces[0]?.tryOnPath ?? look.pieces[0]?.garmentPath;
+        const cover = look.fullPath ?? look.outfitPath ?? look.pieces[0]?.tryOnPath ?? look.pieces[0]?.garmentPath;
         return (
           <Card key={look.id} className="space-y-3">
             <button className="flex w-full items-center gap-4 text-left" onClick={() => setOpen(open === look.id ? null : look.id)} aria-expanded={open === look.id}>
@@ -144,9 +176,13 @@ export function MyLooksStep({ onBack }: { onBack: () => void }) {
             {open === look.id && (
               <>
                 <LookDetail look={look} urls={urls} />
-                <div className="flex justify-end">
+                {!canEdit && <Note>{t("looks.needPhotos")}</Note>}
+                <div className="flex flex-wrap justify-end gap-3">
                   <Button variant="ghost" onClick={() => remove(look)}>
                     {t("looks.delete")}
+                  </Button>
+                  <Button variant="secondary" disabled={!canEdit || opening !== null} onClick={() => edit(look)}>
+                    {opening === look.id ? t("looks.opening") : t("looks.edit")}
                   </Button>
                 </div>
               </>
