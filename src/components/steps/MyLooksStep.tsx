@@ -103,11 +103,14 @@ function LookDetail({ look, urls }: { look: SavedLook; urls: Record<string, stri
 export function MyLooksStep({
   canEdit,
   onEdit,
+  onRenamed,
   onBack,
 }: {
   /** Editing needs the person's photos (restored from the account or taken this session). */
   canEdit: boolean;
   onEdit: (look: SavedLook) => Promise<void>;
+  /** The look in progress may be this one: it keeps the new name. */
+  onRenamed: (look: SavedLook) => void;
   onBack: () => void;
 }) {
   const { t, locale } = useI18n();
@@ -148,6 +151,7 @@ export function MyLooksStep({
     try {
       const renamed = await renameLook(look, name);
       setLooks((ls) => ls?.map((l) => (l.id === look.id ? renamed : l)) ?? null);
+      onRenamed(renamed);
     } catch {
       setFailed(true);
     }

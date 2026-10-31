@@ -395,6 +395,16 @@ export function ClaraApp() {
     setStep("look");
   };
 
+  /** A look renamed in My looks: the session copy takes the new name, so saving it again keeps it. */
+  const renamedLook = (renamed: SavedLook) => {
+    const rename = (l: Look) => (l.saved?.id === renamed.id ? { ...l, saved: renamed, name: renamed.name ?? undefined } : l);
+    setLooks((ls) => ls.map(rename));
+    // Still "Saved" if it was: the account already has the new name.
+    if (!look) return;
+    const before = lookSignature(look, trials, me, goals, beauty);
+    setSave((s) => (s?.signature === before ? { ...s, signature: lookSignature(rename(look), trials, me, goals, beauty) } : s));
+  };
+
   const onDeleteData = async () => {
     if (!window.confirm(t("account.confirmDeleteData"))) return;
     try {
@@ -699,6 +709,7 @@ export function ClaraApp() {
             key={account.user.id}
             canEdit={!!me}
             onEdit={editSavedLook}
+            onRenamed={renamedLook}
             onBack={() => {
               if (back) {
                 setCurrent(back.current);
