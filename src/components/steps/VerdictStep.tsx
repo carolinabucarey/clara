@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
-import { errorCode, requestVerdict, tryOn } from "@/lib/flow";
+import { checkTryOnFidelity, errorCode, requestVerdict, tryOn } from "@/lib/flow";
 import { buildVerdict } from "@/lib/verdict";
 import { renderShareCard } from "@/lib/share";
 import type { AxisVerdict, Goal, Verdict } from "@/lib/types";
@@ -115,7 +115,11 @@ export function VerdictStep({
     onUpdate({ tryOnError: undefined });
     try {
       const url = await tryOn(me.bodyBlob, g.upload, g.attrs.category);
-      onUpdate({ tryOnUrl: url });
+      onUpdate({ tryOnUrl: url, fidelityWarning: undefined });
+      // Local check, no API cost: did the try-on change the face beyond the garment?
+      checkTryOnFidelity(me.bodyUrl, url)
+        .then((issues) => onUpdate({ fidelityWarning: issues.length > 0 }))
+        .catch(() => undefined);
     } catch (e) {
       onUpdate({ tryOnError: errorCode(e) });
     } finally {
@@ -239,6 +243,8 @@ export function VerdictStep({
           </button>
         </div>
       </Card>
+
+      {trial.fidelityWarning && <Note>{t("verdict.fidelityWarning")}</Note>}
 
       {drafting && <Spinner label={t("verdict.drafting")} />}
 

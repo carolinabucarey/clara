@@ -35,7 +35,18 @@ export interface Trial {
   draftLocale?: string;
   lipUrl?: string;
   lipBeforeUrl?: string;
+  /** "Better version": the same garment recolored to the user's palette, tried on. */
+  betterUrl?: string;
+  betterGarmentUrl?: string;
+  betterHex?: string;
+  /** The try-on image changed the face noticeably (see lib/pose/fidelity). */
+  fidelityWarning?: boolean;
 }
+
+// Fields to clear when their inputs change.
+const STALE_BETTER: Partial<Trial> = { betterUrl: undefined, betterGarmentUrl: undefined, betterHex: undefined };
+const STALE_VERDICT: Partial<Trial> = { result: undefined, draft: undefined, lipUrl: undefined, lipBeforeUrl: undefined, ...STALE_BETTER };
+const STALE_TRY_ON: Partial<Trial> = { tryOnUrl: undefined, tryOnError: undefined, fidelityWarning: undefined, ...STALE_BETTER };
 
 const STEPS: Array<Exclude<Step, "compare">> = ["garment", "photos", "profile", "verdict", "rescue"];
 
@@ -126,8 +137,19 @@ export function ClaraApp() {
             onDone={(g) => {
               const existing = trials.findIndex((tr) => tr.garment.id === g.id);
               if (existing >= 0) {
-                // Same photo, possibly corrected attributes: invalidate the verdict.
-                updateTrial({ garment: g, result: undefined, draft: undefined, lipUrl: undefined }, existing);
+                // Same photo, possibly corrected attributes: invalidate the verdict, and the
+                // try-on too when the category (what YouCam replaces) changed.
+                const prev = trials[existing].garment;
+                const retry = prev.attrs.category !== g.attrs.category;
+                updateTrial(
+                  {
+                    garment: g,
+                    ...STALE_VERDICT,
+                    ...(retry ? STALE_TRY_ON : {}),
+                    ...(prev.color.hex !== g.color.hex ? STALE_BETTER : {}),
+                  },
+                  existing,
+                );
                 setCurrent(existing);
               } else {
                 setTrials((ts) => [...ts, { garment: g }]);
@@ -142,7 +164,8 @@ export function ClaraApp() {
             me={me}
             onDone={(m) => {
               setMe(m);
-              setTrials((ts) => ts.map((tr) => ({ ...tr, result: undefined, draft: undefined })));
+              // New photos: everything that was computed on the old ones is stale.
+              setTrials((ts) => ts.map((tr) => ({ ...tr, ...STALE_VERDICT, ...STALE_TRY_ON })));
               setStep("profile");
             }}
             onKeep={() => setStep("profile")}
@@ -155,7 +178,7 @@ export function ClaraApp() {
             onGoals={setGoals}
             onChange={(patch) => {
               setMe({ ...me, ...patch });
-              setTrials((ts) => ts.map((tr) => ({ ...tr, result: undefined, draft: undefined, lipUrl: undefined })));
+              setTrials((ts) => ts.map((tr) => ({ ...tr, ...STALE_VERDICT })));
             }}
             onRetake={() => setStep("photos")}
             onDone={() => setStep("verdict")}

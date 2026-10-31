@@ -6,10 +6,12 @@
 import { buildColorProfile } from "./color/profile";
 import { DEFAULT_ATTRIBUTES } from "./garment/defaults";
 import { dominantColors, looksMulticolor } from "./color/dominant";
+import { flattenOnto, recolorPixels } from "./color/recolor";
 import { describeGarmentColor } from "./color/garment";
 import { faceCrop, getPixels, loadImage, prepareUpload, toCanvas, type Rect } from "./image";
 import { measureBody, PoseMeasurementError, LM, type Landmark } from "./pose/measure";
 import { detectFaces, detectPose } from "./pose/vision";
+import { fidelityIssues, meanDeltaE, type FidelityIssue } from "./pose/fidelity";
 import { readSkinTone, runYouCam, YouCamTaskError } from "./youcam/browser";
 import { FEATURES, lipstickEffect } from "./youcam/features";
 import { errorKey } from "./youcam/errors";
@@ -204,6 +206,47 @@ export async function tryOn(body: Blob, garment: Blob, category: GarmentCategory
   );
   if (!res.imageUrl) throw new FlowError("generic");
   return res.imageUrl;
+}
+
+/** Compares the face before and after the try-on (local, no API cost). */
+export async function checkTryOnFidelity(bodyUrl: string, tryOnUrl: string): Promise<FidelityIssue[]> {
+  const W = 720;
+  const [a, b] = await Promise.all([loadImage(bodyUrl), loadImage(tryOnUrl)]);
+  const ca = toCanvas(a, W);
+  const cb = toCanvas(b, W);
+  // Compare in the same coordinate space: both scaled to the same width.
+  const scaleB = ca.width / cb.width;
+  const [fa, fb] = await Promise.all([detectFaces(ca), detectFaces(cb)]);
+  const original = fa[0] ?? null;
+  const result = fb[0]
+    ? { x: fb[0].x * scaleB, y: fb[0].y * scaleB, width: fb[0].width * scaleB, height: fb[0].height * scaleB }
+    : null;
+  let faceDeltaE: number | null = null;
+  if (original && fb[0]) {
+    const crop = (c: HTMLCanvasElement, r: Rect) => getPixels(toCanvas(c, 48, r)).data;
+    const pa = crop(ca, original);
+    const pb = crop(cb, fb[0]);
+    if (pa.length === pb.length) faceDeltaE = meanDeltaE(pa, pb);
+  }
+  return fidelityIssues({ original, result, width: ca.width, faceDeltaE });
+}
+
+/**
+ * "Better version": recolors the isolated garment (YouCam background removal) to a
+ * color from the user's palette, then tries that version on with YouCam.
+ */
+export async function tryOnBetterColor(body: Blob, garment: GarmentAnalysis, targetHex: string) {
+  if (!garment.isolatedUrl) throw new FlowError("generic");
+  const img = await loadImage(garment.isolatedUrl);
+  const canvas = toCanvas(img, 1600);
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  const px = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  if (recolorPixels(px.data, garment.color.hex, targetHex) === 0) throw new FlowError("generic");
+  flattenOnto(px.data);
+  ctx.putImageData(px, 0, 0);
+  const recolored = await prepareUpload(canvas, 1600);
+  const url = await tryOn(body, recolored.blob, garment.attrs.category);
+  return { url, garmentUrl: URL.createObjectURL(recolored.blob) };
 }
 
 /** Applies a lipstick with YouCam makeup try-on, on the try-on photo when the face is big enough. */
