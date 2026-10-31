@@ -67,6 +67,7 @@ export function BeautySection({
   const catalog = useMemo(() => (templates ? templatesFor(templates, beauty.hair) : []), [templates, beauty.hair]);
   const chosen = look.hairTemplateId === undefined ? (suggestions[0]?.templateId ?? null) : look.hairTemplateId;
   const chosenSuggestion = suggestions.find((s) => s.templateId === chosen);
+  const titleOf = (id: string) => templates?.find((x) => x.id === id)?.title ?? "";
 
   const steps = useMemo(
     () => (beauty.makeup ? makeupFor(me.profile, faceShape, outfitHexes) : []),
@@ -92,7 +93,12 @@ export function BeautySection({
         onUpdateLook({ hairUrl, hairKey: hairKey! });
       }
       const url = effects.length > 0 ? await applyMakeupLook(effects, chosen ? hairUrl! : null, me.selfieWideBlob) : hairUrl!;
-      onUpdateLook({ faceUrl: url, faceKey });
+      onUpdateLook({
+        faceUrl: url,
+        faceKey,
+        faceMakeup: kept,
+        faceHair: chosen ? { templateId: chosen, title: titleOf(chosen), code: chosenSuggestion?.code, params: chosenSuggestion?.params } : null,
+      });
     } catch (e) {
       onUpdateLook({ faceError: errorCode(e), faceKey });
     } finally {

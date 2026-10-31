@@ -37,8 +37,17 @@ answers "how does this look on me?" with an honest, explained verdict.
 6. **Make it work.** If the color isn't ideal, YouCam **AI Makeup Virtual Try-On** applies a lipstick in your
    undertone on your own photo (before/after). Cut rescues (belt, tuck, layer, shoes…) and "the same piece
    in your color" come from the same evidence.
-7. **Compare and save.** "Which one?" ranks the pieces tried in the session; the verdict can be downloaded or
-   shared as an image card.
+7. **The full look.** Add the missing half (a bottom for a top, a top for a bottom, a layer) and Clara tries
+   the pieces on together by chaining try-ons, reusing the ones it already has. A deterministic outfit verdict
+   explains how they work together (color between the pieces, volume, top length against the rise); with a
+   single piece, Clara says which colors and cuts to look for.
+8. **Hair and makeup.** YouCam **AI Face Analyzer** reads the face shape once; Clara suggests three haircuts
+   from YouCam's **AI Hairstyle** catalog with the reason for each, and, if the person wants it, a makeup look
+   (blush, eyes, liner, lips) from their undertone, depth and contrast that lets the outfit's color lead. Both
+   are tried on a head-and-shoulders crop of the selfie, before/after. The person chooses which haircut styles
+   to see and whether to see makeup: Clara never guesses gender.
+9. **Compare and save.** "Which one?" ranks the pieces tried in the session; the verdict can be downloaded or
+   shared as an image card. With an account, looks (and, with consent, the profile) are saved.
 
 ## YouCam APIs used
 
@@ -46,12 +55,14 @@ answers "how does this look on me?" with an honest, explained verdict.
 | --- | --- | --- |
 | AI Facial Color Tones Analyzer | `skin-tone-analysis` | Skin, hair, eye and lip colors → undertone, depth, contrast |
 | AI Clothes Virtual Try-On | `cloth-v4` (fallback `cloth`) | The chosen garment, on the user |
-| AI Makeup Virtual Try-On | `makeup-vto` (`lip_color`) | Lipstick rescue on the user's photo |
+| AI Makeup Virtual Try-On | `makeup-vto` (`lip_color`, `blush`, `eye_shadow`, `eye_liner`) | Lipstick rescue and the suggested makeup look |
 | AI Photo Background Removal | `sod` | Isolating the garment before measuring its color |
+| AI Hairstyle Virtual Try-On | `hair-transfer` (v2.1, preset templates) | The suggested haircuts, keeping the person's hair color |
+| AI Face Analyzer | `face-attr-analysis` (`faceShape`, `faceAspectRatio`) | Face shape behind the haircut and blush advice |
 
 All calls follow the V2 pattern: register the file (`POST /s2s/v2.0/file/{feature}`), `PUT` the bytes to the
-signed URL, create the task (`POST /s2s/v2.0/task/{feature}`) and poll its status
-(`GET /s2s/v2.0/task/{feature}/{task_id}`). The API key lives only on the server.
+signed URL, create the task (`POST /s2s/{version}/task/{feature}`, v2.1 for `hair-transfer`) and poll its
+status (`GET /s2s/{version}/task/{feature}/{task_id}`). The API key lives only on the server.
 
 ## Trust principles (every screen follows them)
 
@@ -63,8 +74,10 @@ signed URL, create the task (`POST /s2s/v2.0/task/{feature}`) and poll its statu
 4. **Admits what it doesn't know.** Borderline values, poor light, arms close to the body or loose clothes
    lower the confidence, widen the ranges and are explained; YouCam errors become "retake the photo like this".
 5. **Rescues instead of forbidding.** A different lipstick, the color away from the face, a belt.
-6. **Cares for the photos.** Images are processed in memory and forwarded to YouCam only; Clara has no
-   database and stores nothing. YouCam keeps processed results for 24 hours.
+6. **Cares for the photos.** Without an account, images are processed in memory and forwarded to YouCam
+   only; Clara stores nothing. With an account, Clara keeps only what the person saves (looks, and the
+   profile photos only after an explicit opt-in) in a private folder protected by row-level security, and
+   "Delete my photos and looks" or "Delete my account" removes it. YouCam keeps processed results for 24 hours.
 
 ## Architecture
 
@@ -72,15 +85,22 @@ signed URL, create the task (`POST /s2s/v2.0/task/{feature}`) and poll its statu
 Browser (Next.js client)                 Server (Next.js route handlers)          YouCam API
 - photo capture, resize, face crop  ──▶  /api/youcam/{feature}  (upload+task) ──▶  skin-tone-analysis
 - MediaPipe pose + segmentation          /api/youcam/{feature}/{taskId} (poll)     cloth-v4 / cloth
-  (proportions, locally)                 /api/youcam/image (result proxy)          makeup-vto
-- color k-means on the garment           /api/garment  (Claude vision)             sod
+  (proportions, locally)                 /api/youcam/image (result proxy)          makeup-vto, sod
+- color k-means on the garment           /api/youcam/hair-templates               hair-transfer
+- outfit, makeup, haircut rules          /api/garment  (Claude vision)             face-attr-analysis
 - wizard UI, share card             ◀──  /api/verdict  (rules → Claude text)
+        │                                /api/account  (DELETE, service role)
+        └── supabase-js (RLS) ──▶  Supabase: Auth (email code, Google), Postgres, Storage
 ```
 
 - `src/lib/youcam/` — server client (`client.ts`), routes helpers, error mapping, dev-only result cache.
 - `src/lib/color/` — CIELAB math, color profile, garment color description, dominant colors.
 - `src/lib/pose/` — MediaPipe wrapper (browser) and pure proportion measurement.
-- `src/lib/verdict/` — color rules, cut rules, rescues, palettes, Claude drafting + validator.
+- `src/lib/verdict/` — color rules, cut rules, outfit rules, rescues, palettes, Claude drafting + validator.
+- `src/lib/beauty/` — makeup suggestion, haircut tagging and face-shape rules.
+- `src/lib/look.ts` — pieces of a look by slot and the plan to try them on together.
+- `src/lib/account/`, `src/lib/supabase/` — sign-in, saved looks and profile (browser, under RLS).
+- `supabase/migrations/` — tables, row-level security and the private storage bucket.
 - `src/lib/i18n/` — English (default) and Spanish dictionaries.
 - `src/components/` — the wizard and its steps.
 
@@ -100,9 +120,22 @@ npm run dev
 | `ANTHROPIC_API_KEY` | recommended | Garment reading and verdict text. Without it Clara uses manual chips and template text. |
 | `YOUCAM_API_BASE` | no | Defaults to `https://yce-api-01.makeupar.com` |
 | `YOUCAM_CACHE` | no | `1` caches YouCam results on disk (always on in `next dev`) to save API units |
+| `NEXT_PUBLIC_SUPABASE_URL` | for accounts | Supabase project URL. Without the Supabase variables Clara has no accounts and stores nothing. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | for accounts | Public (anon or publishable) key; RLS protects the data |
+| `SUPABASE_SERVICE_ROLE_KEY` | for accounts | Server only, used by `DELETE /api/account` to delete the auth user |
 
 `npm install` copies the MediaPipe WASM runtime into `public/mediapipe/`; the pose and face models are in
 `public/models/`. Nothing is loaded from third-party CDNs at runtime.
+
+### Accounts (Supabase)
+
+1. Create a Supabase project (the Vercel Marketplace integration also sets the three variables in Vercel).
+2. Run `supabase/migrations/0001_accounts.sql` (SQL editor, or `supabase db push`).
+3. *Authentication → Email Templates → Magic Link*: include `{{ .Token }}` so the email carries the 6-digit code
+   Clara asks for (signing in never leaves the page, so nothing in progress is lost).
+4. *Authentication → URL Configuration*: add your site URL and `<site>/auth/callback` as a redirect URL.
+5. Optional: *Authentication → Providers → Google* with an OAuth client from Google Cloud. Google sign-in opens
+   in a popup and finishes on `/auth/callback`.
 
 ### Tests
 
@@ -114,8 +147,8 @@ npm run build
 
 ### Deploy (Vercel)
 
-Import the repository in Vercel, set `YOUCAM_API_KEY` and `ANTHROPIC_API_KEY`, and deploy. No database or
-storage is needed. Uploads are resized in the browser so requests stay under Vercel's body limit, and the
+Import the repository in Vercel, set `YOUCAM_API_KEY` and `ANTHROPIC_API_KEY`, and deploy. Accounts are
+optional: add the Supabase variables to turn them on. Uploads are resized in the browser so requests stay under Vercel's body limit, and the
 browser polls YouCam task status through short requests, so no function waits for a task to finish.
 
 ### Demo garments
@@ -130,3 +163,5 @@ one-tap examples on the first screen.
 - Seasonal color analysis is debatable; Clara bases its color advice on measured undertone and contrast and
   presents it as style advice.
 - The try-on image can alter details of the face or body; the verdict relies on measurements, not on the generated image.
+- An outfit is built by chaining one-category try-ons, so each extra piece is another generation step.
+- Haircuts and makeup are tried on the selfie, not on the full-body photo: the face there is too small for them.
