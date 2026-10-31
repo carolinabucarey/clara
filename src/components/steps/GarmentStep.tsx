@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState, useSyncExternalStore } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { analyzeGarment, errorCode, FlowError, type GarmentAnalysis } from "@/lib/flow";
 import { describeGarmentColor } from "@/lib/color/garment";
@@ -27,6 +27,8 @@ interface DemoGarment {
 
 const TOP_LENGTHS = ["cropped", "waist", "hip", "tunic"] as const;
 const LONG_LENGTHS = ["mini", "knee", "midi", "maxi", "ankle", "full_length"] as const;
+
+const noSubscribe = () => () => {};
 
 export function GarmentStep({
   initial,
@@ -76,6 +78,35 @@ export function GarmentStep({
     } finally {
       setStage("idle");
     }
+  };
+
+  // A photo copied on the store page works like an upload: a store that blocks our link
+  // fetch can't block the person's own browser. Cmd/Ctrl+V anywhere on this step…
+  const onPaste = useEffectEvent((e: ClipboardEvent) => {
+    if (analysis || stage !== "idle") return;
+    const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
+    if (!file) return;
+    e.preventDefault();
+    void run(file);
+  });
+  useEffect(() => {
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, []);
+
+  // …or a button, for phones where there's no keyboard shortcut to paste with.
+  const canPaste = useSyncExternalStore(noSubscribe, () => !!navigator.clipboard?.read, () => false);
+  const pasteFromClipboard = async () => {
+    setError(null);
+    try {
+      for (const item of await navigator.clipboard.read()) {
+        const type = item.types.find((ty) => ty.startsWith("image/"));
+        if (type) return void run(await item.getType(type));
+      }
+    } catch {
+      /* permission refused or nothing readable: same advice as an empty clipboard */
+    }
+    setError(t("errors.pasteNoImage"));
   };
 
   /** A product photo from the store page, through our same-origin proxy. */
@@ -157,7 +188,14 @@ export function GarmentStep({
           <div className="text-5xl" aria-hidden>
             👗
           </div>
-          <FilePicker label={t("garment.upload")} onFile={(f) => run(f)} />
+          <div className="flex flex-wrap justify-center gap-2">
+            <FilePicker label={t("garment.upload")} onFile={(f) => run(f)} />
+            {canPaste && (
+              <Button variant="secondary" onClick={pasteFromClipboard}>
+                {t("garment.paste")}
+              </Button>
+            )}
+          </div>
           <form
             className="w-full space-y-2 pt-2 text-left"
             onSubmit={(e) => {
