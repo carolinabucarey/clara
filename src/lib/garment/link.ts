@@ -6,7 +6,7 @@ import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
 export class LinkError extends Error {
-  constructor(public code: "linkInvalid" | "linkUnreachable" | "linkNoImage") {
+  constructor(public code: "linkInvalid" | "linkUnreachable" | "linkBlocked" | "linkNoImage") {
     super(code);
     this.name = "LinkError";
   }
@@ -143,6 +143,9 @@ export async function safeFetch(rawUrl: string, opts: { accept: string; maxBytes
       url = new URL(res.headers.get("location")!, url);
       continue;
     }
+    // Stores behind bot protection (Zara's Akamai, say) refuse server fetches outright:
+    // retrying won't help, so say so instead of "try again".
+    if ([401, 403, 429].includes(res.status)) throw new LinkError("linkBlocked");
     if (!res.ok || !res.body) throw new LinkError("linkUnreachable");
     const chunks: Uint8Array[] = [];
     let size = 0;

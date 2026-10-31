@@ -605,6 +605,7 @@ export const en = {
     baseExpired: "The earlier try-on expired. Try again.",
     linkInvalid: "That link doesn't work. Paste the full address of the product page (https://…).",
     linkUnreachable: "I couldn't open that page. Try again, or upload a screenshot of the piece.",
+    linkBlocked: "This store doesn't let me open its pages. Upload a screenshot of the piece instead.",
     linkNoImage: "I didn't find the product photo on that page. Upload a screenshot of the piece instead.",
   },
 };
