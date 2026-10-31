@@ -125,6 +125,8 @@ export const en = {
     tryOnFailed: "The try-on didn't work with this photo.",
     fidelityWarning:
       "Heads up: the try-on image changed parts of your photo beyond the garment. Judge the fit by the shape, not by details of your face or body.",
+    lengthNote:
+      "The try-on judges the length from the photo, and since the piece isn't worn by a model, it can be off. Clara analyzes the length you chose ({length}).",
     templateNote: "Written from the measured data.",
   },
   rescue: {

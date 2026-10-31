@@ -127,6 +127,8 @@ export const es: Dictionary = {
     tryOnFailed: "El probador no funcionó con esta foto.",
     fidelityWarning:
       "Ojo: la imagen del probador cambió partes de tu foto además de la prenda. Juzga el calce por la forma, no por detalles de tu cara o tu cuerpo.",
+    lengthNote:
+      "El probador calcula el largo desde la foto y, como la prenda no está puesta en una modelo, puede equivocarse. Clara analiza el largo que elegiste ({length}).",
     templateNote: "Redactado a partir de los datos medidos.",
   },
   rescue: {
