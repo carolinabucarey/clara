@@ -35,6 +35,10 @@ export function translate(locale: Locale, path: string, params: Params = {}): st
 /** Param keys whose values are themselves translatable codes. */
 const LOCALIZED_PARAMS: Record<string, string> = {
   color: "colors",
+  topColor: "colors",
+  bottomColor: "colors",
+  shade: "shades",
+  shape: "faceShapes",
   undertone: "undertone",
   contrast: "contrast",
   temperature: "temperature",
@@ -49,6 +53,11 @@ export function localizeParams(locale: Locale, params: Params = {}): Params {
     out[k] = ns && typeof v === "string" && hasKey(locale, `${ns}.${v}`) ? translate(locale, `${ns}.${v}`) : v;
   }
   return out;
+}
+
+/** Any text whose params are themselves codes (colors, shades, face shapes…). */
+export function localizedText(locale: Locale, path: string, params?: Params): string {
+  return translate(locale, path, localizeParams(locale, params));
 }
 
 export function evidenceText(locale: Locale, code: string, params?: Params): string {

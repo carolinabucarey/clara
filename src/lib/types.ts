@@ -213,3 +213,81 @@ export interface VerdictDraft {
   uncertainty: string | null;
   source: "claude" | "template";
 }
+
+// ---------- Outfit (several pieces worn together) ----------
+
+export const SLOTS = ["top", "bottom", "full", "outer"] as const;
+export type Slot = (typeof SLOTS)[number];
+
+export function slotFor(category: GarmentCategory): Slot {
+  return category === "upper_body" ? "top" : category === "lower_body" ? "bottom" : category === "full_body" ? "full" : "outer";
+}
+
+export const SLOT_CATEGORY: Record<Slot, GarmentCategory> = {
+  top: "upper_body",
+  bottom: "lower_body",
+  full: "full_body",
+  outer: "outer",
+};
+
+export type OutfitVerdict = "works_together" | "works_with_tweaks" | "clash";
+
+export interface OutfitResult {
+  verdict: OutfitVerdict;
+  score: number;
+  confidence: Confidence;
+  evidence: Evidence[];
+  /** Rescue codes (i18n `rescues.<code>`) that make the combination work better. */
+  tweaks: string[];
+}
+
+/** What to look for when the outfit is missing its other half. */
+export interface ComplementSuggestion {
+  slot: Slot;
+  colors: string[];
+  /** i18n keys under `look.tips`. */
+  tips: string[];
+}
+
+// ---------- Beauty (face shape, makeup, hairstyle) ----------
+
+export const FACE_SHAPES = ["oval", "round", "square", "heart", "oblong", "diamond", "triangle", "inv_triangle"] as const;
+export type FaceShape = (typeof FACE_SHAPES)[number];
+
+export interface FaceShapeReading {
+  shape: FaceShape;
+  measured: FaceShape;
+  /** Face width ÷ height reported by YouCam, when available. */
+  aspect: number | null;
+  corrected?: boolean;
+}
+
+export type HairStyleGroup = "feminine" | "masculine" | "all";
+
+export interface BeautyPrefs {
+  /** null until the person answers. */
+  makeup: boolean | null;
+  hair: HairStyleGroup;
+}
+
+export type MakeupCategory = "lip_color" | "blush" | "eye_shadow" | "eye_liner";
+
+export interface MakeupStep {
+  category: MakeupCategory;
+  /** Main shade; eye shadow carries a second, deeper one. */
+  colors: string[];
+  intensity: number;
+  pattern?: string;
+  /** Evidence code (i18n `beauty.why.<code>`) and its params. */
+  code: string;
+  params?: Record<string, string | number>;
+}
+
+export interface HairSuggestion {
+  templateId: string;
+  title: string;
+  thumb: string | null;
+  /** Evidence code (i18n `beauty.hairWhy.<code>`). */
+  code: string;
+  params?: Record<string, string | number>;
+}

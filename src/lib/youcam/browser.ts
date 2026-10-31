@@ -4,6 +4,7 @@
 // poll until it finishes. The API key never reaches the browser.
 
 import type { Feature } from "./features";
+import type { FaceShape } from "../types";
 
 export interface YouCamResult {
   feature: Feature;
@@ -94,4 +95,40 @@ export function readSkinTone(results: Record<string, unknown>) {
     lip: pick("lip_color", "lipColor"),
     lighting,
   };
+}
+
+/** First value found under `key` at any depth of a result object. */
+function findKey(value: unknown, key: string, depth = 0): unknown {
+  if (!value || typeof value !== "object" || depth > 4) return undefined;
+  const obj = value as Record<string, unknown>;
+  if (key in obj) return obj[key];
+  for (const v of Object.values(obj)) {
+    const found = findKey(v, key, depth + 1);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+const FACE_SHAPES: Record<string, FaceShape> = {
+  oval: "oval",
+  round: "round",
+  square: "square",
+  heart: "heart",
+  oblong: "oblong",
+  diamond: "diamond",
+  triangle: "triangle",
+  invtriangle: "inv_triangle",
+};
+
+/** Face shape and width÷height from face-attr-analysis; null when YouCam couldn't tell. */
+export function readFaceShape(results: Record<string, unknown>): { shape: FaceShape; aspect: number | null } | null {
+  const raw = findKey(results, "faceshape");
+  const shape = typeof raw === "string" ? FACE_SHAPES[raw.toLowerCase().replace(/[^a-z]/g, "")] : undefined;
+  if (!shape) return null;
+  const ratio = findKey(results, "face_aspect_ratio");
+  const aspect =
+    Array.isArray(ratio) && typeof ratio[0] === "number" && typeof ratio[1] === "number" && ratio[1] > 0
+      ? Math.round((ratio[0] / ratio[1]) * 100) / 100
+      : null;
+  return { shape, aspect };
 }

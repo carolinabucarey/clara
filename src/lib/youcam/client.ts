@@ -5,7 +5,7 @@
 // (POST /s2s/v2.0/task/{feature}) and poll GET /s2s/v2.0/task/{feature}/{task_id}
 // until task_status is "success" or "error". Units are charged only on success.
 
-import type { Feature } from "./features";
+import { taskVersion, type Feature } from "./features";
 
 export const YOUCAM_BASE = process.env.YOUCAM_API_BASE?.replace(/\/$/, "") || "https://yce-api-01.makeupar.com";
 
@@ -92,7 +92,7 @@ export async function uploadFile(feature: Feature, bytes: Uint8Array, contentTyp
 }
 
 export async function createTask(feature: Feature, body: Record<string, unknown>): Promise<string> {
-  const res = await call<{ data?: { task_id?: string } }>(`/s2s/v2.0/task/${feature}`, {
+  const res = await call<{ data?: { task_id?: string } }>(`/s2s/${taskVersion(feature)}/task/${feature}`, {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -109,7 +109,7 @@ export type TaskState =
 export async function getTask(feature: Feature, taskId: string): Promise<TaskState> {
   const res = await call<{
     data?: { task_status?: string; error?: string | null; error_message?: string | null; results?: unknown };
-  }>(`/s2s/v2.0/task/${feature}/${encodeURIComponent(taskId)}`, { method: "GET" });
+  }>(`/s2s/${taskVersion(feature)}/task/${feature}/${encodeURIComponent(taskId)}`, { method: "GET" });
   const data = res.data ?? {};
   if (data.task_status === "success") {
     // `results` is an object for V2 tasks; older payloads wrapped it in an array.
@@ -120,6 +120,38 @@ export async function getTask(feature: Feature, taskId: string): Promise<TaskSta
     return { status: "error", code: data.error || "unknown_internal_error", message: data.error_message || "" };
   }
   return { status: "running" };
+}
+
+export interface Template {
+  id: string;
+  title: string;
+  thumb: string | null;
+  category: string | null;
+}
+
+/** Preset templates of a feature (hairstyles), following YouCam's next_token pagination. */
+export async function listTemplates(feature: Feature, maxPages = 20): Promise<Template[]> {
+  const out: Template[] = [];
+  let token: string | null = null;
+  for (let page = 0; page < maxPages; page++) {
+    const qs = new URLSearchParams({ page_size: "20" });
+    if (token) qs.set("starting_token", token);
+    const res = await call<{
+      data?: { templates?: Array<Record<string, unknown>>; next_token?: string | null };
+    }>(`/s2s/${taskVersion(feature)}/task/template/${feature}?${qs}`, { method: "GET" });
+    for (const t of res.data?.templates ?? []) {
+      if (typeof t.id !== "string" && typeof t.id !== "number") continue;
+      out.push({
+        id: String(t.id),
+        title: typeof t.title === "string" ? t.title : "",
+        thumb: typeof t.thumb === "string" ? t.thumb : null,
+        category: typeof t.category_name === "string" ? t.category_name : null,
+      });
+    }
+    token = res.data?.next_token ?? null;
+    if (!token) break;
+  }
+  return out;
 }
 
 /** Free endpoint: units each feature costs. */

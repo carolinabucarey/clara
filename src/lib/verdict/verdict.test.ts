@@ -6,7 +6,7 @@ import { evaluateCut } from "./cut";
 import { buildVerdict } from "./index";
 import { templateDraft, violations } from "./draft";
 import { DEFAULT_ATTRIBUTES } from "../garment/read";
-import { evidenceText, rescueText } from "../i18n";
+import { evidenceText, localizedText, rescueText } from "../i18n";
 import { en } from "../i18n/en";
 import type { ColorProfile, GarmentAttributes, Proportions } from "../types";
 
@@ -140,10 +140,14 @@ describe("language validator", () => {
 
 describe("i18n coverage", () => {
   it("has evidence and rescue text for every code, in both languages, without leftover params", () => {
-    const params = { color: "blue", undertone: "warm", temperature: "cool", contrast: "low", skinHue: 55, deltaL: 30, garmentL: 40, garmentC: 50, shoulderHip: "1.00", waistHip: "0.80", torsoLeg: "0.62", heightCm: 160, name: "coral" };
+    const params = { color: "blue", undertone: "warm", temperature: "cool", contrast: "low", skinHue: 55, deltaL: 30, garmentL: 40, garmentC: 50, shoulderHip: "1.00", waistHip: "0.80", torsoLeg: "0.62", heightCm: 160, name: "coral", topColor: "cream", bottomColor: "navy", gap: 40, shade: "peach", shape: "oval" };
     for (const locale of ["en", "es"] as const) {
       for (const code of Object.keys(en.evidence)) expect(evidenceText(locale, code, params)).not.toMatch(/\{\w+\}|^evidence\./);
       for (const code of Object.keys(en.rescues)) expect(rescueText(locale, code, params)).not.toMatch(/\{\w+\}|^rescues\./);
+      for (const ns of ["look.tips", "beauty.why", "beauty.hairWhy"] as const) {
+        const keys = Object.keys(ns.split(".").reduce<Record<string, unknown>>((n, k) => n[k] as Record<string, unknown>, en));
+        for (const code of keys) expect(localizedText(locale, `${ns}.${code}`, params)).not.toMatch(/\{\w+\}|^(look|beauty)\./);
+      }
     }
   });
 });

@@ -12,12 +12,13 @@ import { faceCrop, getPixels, loadImage, prepareUpload, toCanvas, type Rect } fr
 import { measureBody, PoseMeasurementError, LM, type Landmark } from "./pose/measure";
 import { detectFaces, detectPose } from "./pose/vision";
 import { fidelityIssues, meanDeltaE, type FidelityIssue } from "./pose/fidelity";
-import { readSkinTone, runYouCam, YouCamTaskError } from "./youcam/browser";
-import { FEATURES, lipstickEffect } from "./youcam/features";
+import { readFaceShape, readSkinTone, runYouCam, YouCamTaskError } from "./youcam/browser";
+import { FACE_ATTRIBUTES, FEATURES, lipstickEffect, type MakeupEffect } from "./youcam/features";
 import { errorKey } from "./youcam/errors";
 import type { Locale } from "./i18n";
 import type {
   ColorProfile,
+  FaceShapeReading,
   GarmentAttributes,
   GarmentCategory,
   GarmentColor,
@@ -152,6 +153,30 @@ export interface SelfieAnalysis {
   profile: ColorProfile;
   selfieBlob: Blob;
   selfieUrl: string;
+  /** Head and shoulders, JPEG ≤ 1024 px: the framing YouCam's hairstyle try-on asks for. */
+  selfieWideBlob: Blob;
+  selfieWideUrl: string;
+  /** null when YouCam couldn't read the face shape; the person can still choose it. */
+  faceShape: FaceShapeReading | null;
+}
+
+/** Head-and-shoulders crop around a detected face. */
+function portraitCrop(face: Rect, imgW: number, imgH: number): Rect {
+  const width = Math.min(imgW, face.width * 3.2);
+  const height = Math.min(imgH, width * 1.25);
+  const x = Math.max(0, Math.min(imgW - width, face.x + face.width / 2 - width / 2));
+  const y = Math.max(0, Math.min(imgH - height, face.y - face.height * 0.8));
+  return { x, y, width, height };
+}
+
+/** Face shape with YouCam's face analyzer (the photo must be a tight face crop). */
+export async function analyzeFaceShape(faceBlob: Blob): Promise<FaceShapeReading | null> {
+  const res = await runYouCam(FEATURES.faceAnalyzer, {
+    src: faceBlob,
+    params: { features: [...FACE_ATTRIBUTES], face_angle_strictness_level: "medium" },
+  });
+  const read = readFaceShape(res.results);
+  return read ? { shape: read.shape, measured: read.shape, aspect: read.aspect } : null;
 }
 
 export async function analyzeSelfie(file: Blob): Promise<SelfieAnalysis> {
@@ -165,18 +190,30 @@ export async function analyzeSelfie(file: Blob): Promise<SelfieAnalysis> {
   const crop = faceCrop(faces[0], canvas.width, canvas.height);
   if (faces[0].width < 100) throw new FlowError("faceTooSmall");
   const prepared = await prepareUpload(canvas, 1024, crop);
+  const wide = await prepareUpload(canvas, 1024, portraitCrop(faces[0], canvas.width, canvas.height));
 
-  const res = await runYouCam(FEATURES.skinTone, {
-    src: prepared.blob,
-    params: { face_angle_strictness_level: "medium" },
-  });
+  const [res, faceShape] = await Promise.all([
+    runYouCam(FEATURES.skinTone, { src: prepared.blob, params: { face_angle_strictness_level: "medium" } }),
+    // The face shape only feeds hairstyle advice: never block the profile on it.
+    analyzeFaceShape(prepared.blob).catch((e) => {
+      console.warn("face shape analysis failed", e);
+      return null;
+    }),
+  ]);
   const colors = readSkinTone(res.results);
   if (!colors.skin) throw new FlowError("noFace");
   const profile = buildColorProfile(
     { skin: colors.skin, hair: colors.hair, eye: colors.eye, lip: colors.lip },
     { lighting: colors.lighting },
   );
-  return { profile, selfieBlob: prepared.blob, selfieUrl: URL.createObjectURL(prepared.blob) };
+  return {
+    profile,
+    selfieBlob: prepared.blob,
+    selfieUrl: URL.createObjectURL(prepared.blob),
+    selfieWideBlob: wide.blob,
+    selfieWideUrl: URL.createObjectURL(wide.blob),
+    faceShape,
+  };
 }
 
 export interface BodyAnalysis {
@@ -204,6 +241,61 @@ export async function tryOn(body: Blob, garment: Blob, category: GarmentCategory
     { src: body, ref: garment, params: { garment_category: category, change_shoes: false, filter_multi_person: "normal" } },
     signal,
   );
+  if (!res.imageUrl) throw new FlowError("generic");
+  return res.imageUrl;
+}
+
+/** Tries a garment on over an earlier try-on result, to build an outfit piece by piece. */
+export async function tryOnOver(baseUrl: string, garment: Blob, category: GarmentCategory, signal?: AbortSignal) {
+  // YouCam result links expire after a couple of hours; callers fall back to the body photo.
+  const img = await loadImage(baseUrl).catch(() => {
+    throw new FlowError("baseExpired");
+  });
+  const base = await prepareUpload(img, 1600);
+  return tryOn(base.blob, garment, category, signal);
+}
+
+/**
+ * Outfit try-on: YouCam changes one garment category per task, so the pieces are
+ * applied in sequence, starting from an existing result when there is one.
+ */
+export async function tryOnOutfit(
+  body: Blob,
+  baseUrl: string | null,
+  steps: Array<{ garment: Blob; category: GarmentCategory }>,
+  signal?: AbortSignal,
+  /** Every piece of the look, used if the base image has expired. */
+  allSteps = steps,
+): Promise<string> {
+  let url = baseUrl;
+  if (url && steps.length > 0) {
+    try {
+      url = await tryOnOver(url, steps[0].garment, steps[0].category, signal);
+      steps = steps.slice(1);
+    } catch (e) {
+      if (!(e instanceof FlowError && e.code === "baseExpired")) throw e;
+      return tryOnOutfit(body, null, allSteps, signal); // start again from the body photo
+
+    }
+  }
+  for (const s of steps) {
+    url = url ? await tryOnOver(url, s.garment, s.category, signal) : await tryOn(body, s.garment, s.category, signal);
+  }
+  if (!url) throw new FlowError("generic");
+  return url;
+}
+
+/** Hairstyle try-on on the head-and-shoulders selfie, keeping the person's own hair color. */
+export async function applyHairstyle(selfieWide: Blob, templateId: string) {
+  const res = await runYouCam(FEATURES.hairTransfer, { src: selfieWide, params: { template_id: templateId, hair_color: "src" } });
+  if (!res.imageUrl) throw new FlowError("generic");
+  return res.imageUrl;
+}
+
+/** The suggested makeup, on the hairstyle result when there is one, otherwise on the selfie. */
+export async function applyMakeupLook(effects: MakeupEffect[], baseUrl: string | null, selfieWide: Blob) {
+  const src = baseUrl ? (await prepareUpload(await loadImage(baseUrl), 1600)).blob : selfieWide;
+  const res = await runYouCam(FEATURES.makeup, { src, params: { effects, version: "1.0" } });
   if (!res.imageUrl) throw new FlowError("generic");
   return res.imageUrl;
 }

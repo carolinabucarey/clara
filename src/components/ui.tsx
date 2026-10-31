@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
-import type { Confidence, Verdict } from "@/lib/types";
+import type { Confidence, Evidence, OutfitVerdict, Verdict } from "@/lib/types";
 import { useI18n } from "@/lib/i18n/context";
 
 export function cx(...parts: Array<string | false | null | undefined>) {
@@ -112,6 +112,47 @@ export function VerdictPill({ verdict, size = "md" }: { verdict: Verdict; size?:
       <span className={cx("h-2 w-2 rounded-full", VERDICT_DOT[verdict])} aria-hidden />
       {t(`verdict.levels.${verdict}`)}
     </span>
+  );
+}
+
+const OUTFIT_TONE: Record<OutfitVerdict, Verdict> = {
+  works_together: "flatters",
+  works_with_tweaks: "works_with_tweaks",
+  clash: "not_flattering",
+};
+
+export function OutfitPill({ verdict }: { verdict: OutfitVerdict }) {
+  const { t } = useI18n();
+  const tone = OUTFIT_TONE[verdict];
+  return (
+    <span className={cx("inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold", VERDICT_STYLE[tone])}>
+      <span className={cx("h-2 w-2 rounded-full", VERDICT_DOT[tone])} aria-hidden />
+      {t(`look.levels.${verdict}`)}
+    </span>
+  );
+}
+
+/** Evidence lines with their +/− marks, as shown under every verdict. */
+export function EvidenceList({ items, render }: { items: Evidence[]; render: (e: Evidence) => string }) {
+  return (
+    <ul className="space-y-2">
+      {items.map((e, i) => (
+        <li key={`${e.code}-${i}`} className="flex gap-2 text-sm leading-relaxed text-ink/80">
+          <span
+            aria-hidden
+            className={cx(
+              "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+              e.polarity === "plus" && "bg-sage-soft text-sage",
+              e.polarity === "minus" && "bg-rose-soft text-rose",
+              e.polarity === "neutral" && "bg-sand text-muted",
+            )}
+          >
+            {e.polarity === "plus" ? "+" : e.polarity === "minus" ? "−" : "·"}
+          </span>
+          {render(e)}
+        </li>
+      ))}
+    </ul>
   );
 }
 

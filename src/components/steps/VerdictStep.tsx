@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
-import { checkTryOnFidelity, errorCode, requestVerdict, tryOn } from "@/lib/flow";
+import { checkTryOnFidelity, errorCode, FlowError, requestVerdict, tryOn, tryOnOver } from "@/lib/flow";
 import { buildVerdict } from "@/lib/verdict";
 import { renderShareCard } from "@/lib/share";
-import type { AxisVerdict, Goal, Verdict } from "@/lib/types";
+import type { AxisVerdict, Goal, Slot, Verdict } from "@/lib/types";
 import type { Me, Trial } from "../ClaraApp";
-import { Button, Card, ConfidenceBadge, cx, ErrorNote, Note, SkeletonImage, Spinner, StepHeader, Swatch, VerdictPill } from "../ui";
+import { Button, Card, ConfidenceBadge, ErrorNote, EvidenceList, Note, SkeletonImage, Spinner, StepHeader, Swatch, VerdictPill } from "../ui";
 
 function AxisCard({
   title,
@@ -52,24 +52,9 @@ function AxisCard({
           <span aria-hidden>{open ? "−" : "+"}</span>
         </button>
         {open && (
-          <ul className="mt-2 space-y-2">
-            {axis.evidence.map((e, i) => (
-              <li key={`${e.code}-${i}`} className="flex gap-2 text-sm leading-relaxed text-ink/80">
-                <span
-                  aria-hidden
-                  className={cx(
-                    "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold",
-                    e.polarity === "plus" && "bg-sage-soft text-sage",
-                    e.polarity === "minus" && "bg-rose-soft text-rose",
-                    e.polarity === "neutral" && "bg-sand text-muted",
-                  )}
-                >
-                  {e.polarity === "plus" ? "+" : e.polarity === "minus" ? "−" : "·"}
-                </span>
-                {ev(e.code, e.params)}
-              </li>
-            ))}
-          </ul>
+          <div className="mt-2">
+            <EvidenceList items={axis.evidence} render={(e) => ev(e.code, e.params)} />
+          </div>
         )}
       </div>
       <ConfidenceBadge level={axis.confidence} />
@@ -81,8 +66,11 @@ export function VerdictStep({
   me,
   trial,
   goals,
+  tryOnBase,
+  addSlot,
+  onAddPiece,
   onUpdate,
-  onRescue,
+  onLook,
   onAnother,
   onCompare,
   onEditGarment,
@@ -90,8 +78,13 @@ export function VerdictStep({
   me: Me;
   trial: Trial;
   goals: Goal[];
+  /** Another piece of the same look already tried on: show this one with it. */
+  tryOnBase?: string;
+  /** The half the look is missing (a bottom for a top, and so on). */
+  addSlot?: Slot;
+  onAddPiece: (slot: Slot) => void;
   onUpdate: (patch: Partial<Trial>) => void;
-  onRescue: () => void;
+  onLook: () => void;
   onAnother: () => void;
   onCompare?: () => void;
   onEditGarment: () => void;
@@ -114,8 +107,17 @@ export function VerdictStep({
     setTryOnBusy(true);
     onUpdate({ tryOnError: undefined });
     try {
-      const url = await tryOn(me.bodyBlob, g.upload, g.attrs.category);
-      onUpdate({ tryOnUrl: url, fidelityWarning: undefined });
+      let url: string | null = null;
+      let over: string | undefined;
+      if (tryOnBase) {
+        url = await tryOnOver(tryOnBase, g.upload, g.attrs.category).catch((e) => {
+          if (e instanceof FlowError && e.code === "baseExpired") return null;
+          throw e;
+        });
+        if (url) over = tryOnBase;
+      }
+      url ??= await tryOn(me.bodyBlob, g.upload, g.attrs.category);
+      onUpdate({ tryOnUrl: url, tryOnOverUrl: over, fidelityWarning: undefined });
       // Local check, no API cost: did the try-on change the face beyond the garment?
       checkTryOnFidelity(me.bodyUrl, url)
         .then((issues) => onUpdate({ fidelityWarning: issues.length > 0 }))
@@ -126,7 +128,7 @@ export function VerdictStep({
       setTryOnBusy(false);
     }
   };
-  const tryOnKey = `${g.id}:${me.bodyUrl}:${g.attrs.category}`;
+  const tryOnKey = `${g.id}:${me.bodyUrl}:${g.attrs.category}:${tryOnBase ?? ""}`;
   useEffect(() => {
     if (trial.tryOnUrl || trial.tryOnError || started.current === tryOnKey) return;
     started.current = tryOnKey;
@@ -267,7 +269,12 @@ export function VerdictStep({
         <Button variant="secondary" onClick={save} disabled={sharing}>
           {t("verdict.save")}
         </Button>
-        <Button onClick={onRescue}>{t("verdict.rescue")}</Button>
+        {addSlot && (
+          <Button variant="secondary" onClick={() => onAddPiece(addSlot)}>
+            {t(`verdict.complement.${addSlot}`)}
+          </Button>
+        )}
+        <Button onClick={onLook}>{t("verdict.look")}</Button>
       </div>
     </div>
   );
