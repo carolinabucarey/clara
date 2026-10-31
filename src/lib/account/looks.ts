@@ -25,6 +25,8 @@ export interface SavedPiece {
   draftLocale: string | null;
   garmentPath: string;
   tryOnPath: string | null;
+  /** The same piece recolored to the person's palette, tried on (RescueSection). */
+  better?: { hex: string; tryOnPath: string };
   /** Store page the piece came from. */
   source?: { url: string; title: string | null };
 }
@@ -88,7 +90,7 @@ function fromRow(r: LookRow): SavedLook {
 }
 
 export function lookImagePaths(look: SavedLook): string[] {
-  return [look.fullPath, look.outfitPath, look.facePath, ...look.pieces.flatMap((p) => [p.garmentPath, p.tryOnPath])].filter(
+  return [look.fullPath, look.outfitPath, look.facePath, ...look.pieces.flatMap((p) => [p.garmentPath, p.tryOnPath, p.better?.tryOnPath])].filter(
     (p): p is string => !!p,
   );
 }
@@ -129,6 +131,7 @@ export async function saveLook(input: LookToSave, existing?: SavedLook | null): 
     const pieces: SavedPiece[] = [];
     for (const [i, { slot, trial }] of input.pieces.entries()) {
       const g = trial.garment;
+      const betterPath = trial.betterHex ? await upload(`piece-${i}-color`, trial.betterUrl).catch(() => null) : null;
       pieces.push({
         slot,
         attrs: g.attrs,
@@ -138,6 +141,7 @@ export async function saveLook(input: LookToSave, existing?: SavedLook | null): 
         draftLocale: trial.draftLocale ?? null,
         garmentPath: (await upload(`piece-${i}`, g.isolatedUrl, g.upload))!,
         tryOnPath: await upload(`piece-${i}-on`, trial.tryOnUrl).catch(() => null),
+        ...(betterPath ? { better: { hex: trial.betterHex!, tryOnPath: betterPath } } : {}),
         ...(g.source ? { source: g.source } : {}),
       });
     }
@@ -228,6 +232,8 @@ export async function openSavedLook(saved: SavedLook) {
           source: p.source,
         },
         tryOnUrl: url(p.tryOnPath),
+        betterUrl: url(p.better?.tryOnPath ?? null),
+        betterHex: p.better?.hex,
         result: p.result ?? undefined,
         draft: p.draft ?? undefined,
         draftLocale: p.draftLocale ?? undefined,

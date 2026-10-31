@@ -124,7 +124,7 @@ const STEPS: Array<Exclude<Step, "compare" | "looks">> = ["garment", "photos", "
 const lookSignature = (l: Look, trials: Trial[], me: Me | null, goals: Goal[], beauty: BeautyPrefs) =>
   JSON.stringify([{ ...l, saved: undefined }, Object.values(l.pieces).map((i) => {
     const tr = trials[i!];
-    return [tr.garment.id, tr.garment.attrs, tr.garment.color, tr.result, tr.draft, tr.tryOnUrl];
+    return [tr.garment.id, tr.garment.attrs, tr.garment.color, tr.result, tr.draft, tr.tryOnUrl, tr.betterUrl];
   }), me?.bodyUrl, me?.profile, me?.proportions, goals, beauty]);
 
 /** Identifies the photos in use; either can change on its own. */
@@ -355,7 +355,7 @@ export function ClaraApp() {
     const loaded = await openSavedLook(saved);
     if (lastUser.current !== uid || latestInputs.current.me !== me) {
       const urls = [loaded.outfitUrl, loaded.faceUrl, loaded.fullUrl,
-        ...loaded.trials.flatMap((tr) => [tr.garment.originalUrl, tr.garment.isolatedUrl, tr.tryOnUrl])];
+        ...loaded.trials.flatMap((tr) => [tr.garment.originalUrl, tr.garment.isolatedUrl, tr.tryOnUrl, tr.betterUrl])];
       for (const url of urls) if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
       return;
     }
