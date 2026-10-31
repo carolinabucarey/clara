@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
-import { applyLipstick, errorCode } from "@/lib/flow";
+import { applyLipstick, errorCode, tryOnBetterColor } from "@/lib/flow";
 import type { RescueKind } from "@/lib/types";
 import type { Me, Trial } from "../ClaraApp";
 import { Button, Card, ErrorNote, Note, SkeletonImage, StepHeader, Swatch } from "../ui";
@@ -28,6 +28,24 @@ export function RescueStep({ me, trial, onUpdate, onBack }: { me: Me; trial: Tri
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
+  const [betterBusy, setBetterBusy] = useState(false);
+  const [betterError, setBetterError] = useState<string | null>(null);
+  // Recoloring needs the garment isolated by YouCam and a single main color.
+  const canRecolor = !!trial.garment.isolatedUrl && trial.garment.attrs.pattern === "solid" && !trial.garment.multicolor;
+
+  const runBetter = async () => {
+    if (!result.betterColor) return;
+    setBetterBusy(true);
+    setBetterError(null);
+    try {
+      const { url, garmentUrl } = await tryOnBetterColor(me.bodyBlob, trial.garment, result.betterColor);
+      onUpdate({ betterUrl: url, betterGarmentUrl: garmentUrl, betterHex: result.betterColor });
+    } catch (e) {
+      setBetterError(t(`errors.${errorCode(e)}`));
+    } finally {
+      setBetterBusy(false);
+    }
+  };
 
   const runLip = async () => {
     if (!lip?.lipstick) return;
@@ -110,18 +128,50 @@ export function RescueStep({ me, trial, onUpdate, onBack }: { me: Me; trial: Tri
       )}
 
       {result.betterColor && (
-        <Card className="flex items-center gap-4">
-          <div className="flex items-center">
-            <Swatch hex={trial.garment.color.hex} size={40} />
-            <span className="px-2 text-muted" aria-hidden>
-              →
-            </span>
-            <Swatch hex={result.betterColor} size={40} />
+        <Card className="space-y-3">
+          <div className="flex items-center gap-4">
+            <div className="flex shrink-0 items-center">
+              <Swatch hex={trial.garment.color.hex} size={40} />
+              <span className="px-2 text-muted" aria-hidden>
+                →
+              </span>
+              <Swatch hex={result.betterColor} size={40} />
+            </div>
+            <div>
+              <h2 className="font-display text-lg text-ink">{t("rescue.betterTitle")}</h2>
+              <p className="text-sm text-muted">{t("rescue.betterBody")}</p>
+            </div>
           </div>
-          <div>
-            <h2 className="font-display text-lg text-ink">{t("rescue.betterTitle")}</h2>
-            <p className="text-sm text-muted">{t("rescue.betterBody")}</p>
-          </div>
+          {canRecolor && !trial.betterUrl && !betterBusy && (
+            <div className="flex justify-end">
+              <Button variant="secondary" onClick={runBetter}>
+                {t("rescue.betterTry")}
+              </Button>
+            </div>
+          )}
+          {(betterBusy || trial.betterUrl) && (
+            <div className="grid grid-cols-2 gap-3">
+              <figure>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={trial.tryOnUrl ?? trial.garment.originalUrl}
+                  alt=""
+                  className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover"
+                />
+                <figcaption className="mt-1.5 text-center text-xs text-muted">{t("rescue.yours")}</figcaption>
+              </figure>
+              <figure>
+                {trial.betterUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={trial.betterUrl} alt="" className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
+                ) : (
+                  <SkeletonImage label={t("rescue.betterApplying")} />
+                )}
+                <figcaption className="mt-1.5 text-center text-xs text-muted">{t("rescue.inYourColor")}</figcaption>
+              </figure>
+            </div>
+          )}
+          {betterError && <ErrorNote onRetry={runBetter}>{betterError}</ErrorNote>}
         </Card>
       )}
 

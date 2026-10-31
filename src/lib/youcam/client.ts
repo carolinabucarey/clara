@@ -51,7 +51,7 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
       (body.error as string) ||
       (res.status === 429 ? "rate_limited" : res.status === 401 ? "InvalidApiKey" : `http_${res.status}`);
     const message = (body.message as string) || (body.error_message as string) || text.slice(0, 300);
-    throw new YouCamError(code, message || `YouCam HTTP ${res.status}`, res.status);
+    throw new YouCamError(code, `HTTP ${res.status} ${init.method ?? "GET"} ${path.split("?")[0]}: ${message}`, res.status);
   }
   return body as T;
 }
@@ -154,4 +154,16 @@ export function resultImageUrl(results: Record<string, unknown>): string | null 
     }
   }
   return null;
+}
+
+/** Nested field names of a result object, e.g. "color{skin_color,hair_color},face_quality{lighting}". */
+export function describeShape(value: unknown, depth = 0): string {
+  if (Array.isArray(value)) return `[${value.length ? describeShape(value[0], depth + 1) : ""}]`;
+  if (!value || typeof value !== "object" || depth > 3) return "";
+  return Object.entries(value as Record<string, unknown>)
+    .map(([k, v]) => {
+      const inner = v && typeof v === "object" ? describeShape(v, depth + 1) : "";
+      return inner ? `${k}{${inner}}` : k;
+    })
+    .join(",");
 }
