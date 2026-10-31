@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { preloadVision } from "@/lib/pose/vision";
 import type { GarmentAnalysis } from "@/lib/flow";
-import { missingSlots, outfitKey, placePiece, removePiece, tryOnBaseFor, wearOrder } from "@/lib/look";
+import { fullLookUrl, missingSlots, outfitKey, placePiece, removePiece, tryOnBaseFor, wearOrder } from "@/lib/look";
 import { deleteAccount, signOut, useAccount } from "@/lib/account/session";
 import { deleteAllData, hasProfile, loadProfile, saveProfile } from "@/lib/account/profile";
 import { openSavedLook, saveLook, type SavedHairstyle, type SavedLook } from "@/lib/account/looks";
@@ -246,14 +246,15 @@ export function ClaraApp() {
         me.proportions,
         goals,
       );
-      const styled = !!(look.faceUrl || look.fullUrl);
+      const fullUrl = fullLookUrl(look, outfitUrl) ?? null;
+      const styled = !!(look.faceUrl || fullUrl);
       const saved = await saveLook(
         {
           pieces: order.map((slot) => ({ slot, trial: pieceOf(slot) })),
           outfitUrl,
           outfit,
           faceUrl: look.faceUrl ?? null,
-          fullUrl: look.fullUrl ?? null,
+          fullUrl,
           makeup: styled ? (look.faceMakeup ?? null) : null,
           hairstyle: styled ? (look.faceHair ?? null) : null,
         },

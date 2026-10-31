@@ -7,7 +7,7 @@ import { buildVerdict } from "@/lib/verdict";
 import { renderShareCard } from "@/lib/share";
 import type { AxisVerdict, Goal, Slot, Verdict } from "@/lib/types";
 import type { Me, Trial } from "../ClaraApp";
-import { Button, Card, ConfidenceBadge, ErrorNote, EvidenceList, Note, SkeletonImage, Spinner, StepHeader, Swatch, VerdictPill } from "../ui";
+import { Button, Card, ConfidenceBadge, ErrorNote, EvidenceList, Note, ShareButton, SkeletonImage, Spinner, StepHeader, Swatch, VerdictPill } from "../ui";
 import { ZoomableImage } from "../ZoomableImage";
 
 function AxisCard({
@@ -94,9 +94,7 @@ export function VerdictStep({
   const g = trial.garment;
   const [tryOnBusy, setTryOnBusy] = useState(false);
   const [drafting, setDrafting] = useState(false);
-  const [sharing, setSharing] = useState(false);
   const tryOnRequest = useRef<AbortController | null>(null);
-  const [shareError, setShareError] = useState(false);
 
   const local = useMemo(
     () => buildVerdict({ profile: me.profile, proportions: me.proportions, garment: g.attrs, garmentColor: g.color, goals }),
@@ -183,40 +181,22 @@ export function VerdictStep({
   const draft = trial.draftLocale === locale ? trial.draft : undefined;
   const low = result.cut.confidence === "low" || result.color.confidence === "low";
 
-  const save = async () => {
-    setSharing(true);
-    setShareError(false);
-    try {
-      const levels = {
-        flatters: t("verdict.levels.flatters"),
-        works_with_tweaks: t("verdict.levels.works_with_tweaks"),
-        not_flattering: t("verdict.levels.not_flattering"),
-      } as Record<Verdict, string>;
-      const blob = await renderShareCard({
-        imageUrl: trial.tryOnUrl ?? g.originalUrl,
-        result,
-        draft,
-        labels: { title: t("share.cardTitle"), cut: t("verdict.cut"), color: t("verdict.color"), levels, footer: t("privacy") },
-        fallbackText: {
-          cut: result.cut.evidence[0] ? ev(result.cut.evidence[0].code, result.cut.evidence[0].params) : "",
-          color: result.color.evidence[0] ? ev(result.color.evidence[0].code, result.color.evidence[0].params) : "",
-        },
-      });
-      const file = new File([blob], "clara-verdict.png", { type: "image/png" });
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: "Clara" }).catch(() => undefined);
-      } else {
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "clara-verdict.png";
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-      }
-    } catch {
-      setShareError(true);
-    } finally {
-      setSharing(false);
-    }
+  const shareCard = () => {
+    const levels = {
+      flatters: t("verdict.levels.flatters"),
+      works_with_tweaks: t("verdict.levels.works_with_tweaks"),
+      not_flattering: t("verdict.levels.not_flattering"),
+    } as Record<Verdict, string>;
+    return renderShareCard({
+      imageUrl: trial.tryOnUrl ?? g.originalUrl,
+      result,
+      draft,
+      labels: { title: t("share.cardTitle"), cut: t("verdict.cut"), color: t("verdict.color"), levels, footer: t("privacy") },
+      fallbackText: {
+        cut: result.cut.evidence[0] ? ev(result.cut.evidence[0].code, result.cut.evidence[0].params) : "",
+        color: result.color.evidence[0] ? ev(result.color.evidence[0].code, result.color.evidence[0].params) : "",
+      },
+    });
   };
 
   return (
@@ -275,7 +255,6 @@ export function VerdictStep({
       {draft?.uncertainty ? <Note>{draft.uncertainty}</Note> : low ? <Note>{t("verdict.lowConfidence")}</Note> : null}
       {draft?.source === "template" && <p className="text-xs text-muted">{t("verdict.templateNote")}</p>}
       {trial.tryOnError === "config" && <ErrorNote>{t("errors.config")}</ErrorNote>}
-      {shareError && <ErrorNote onRetry={save}>{t("errors.generic")}</ErrorNote>}
 
       <div className="flex flex-wrap justify-end gap-3">
         <Button variant="ghost" onClick={onAnother}>
@@ -286,9 +265,7 @@ export function VerdictStep({
             {t("verdict.compare")}
           </Button>
         )}
-        <Button variant="secondary" onClick={save} disabled={sharing}>
-          {t("verdict.save")}
-        </Button>
+        <ShareButton render={shareCard} filename="clara-verdict.png" />
         {addSlot && (
           <Button variant="secondary" onClick={() => onAddPiece(addSlot)}>
             {t(`verdict.complement.${addSlot}`)}

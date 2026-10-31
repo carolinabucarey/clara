@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { missingSlots, outfitKey, outfitPlan, placePiece, tryOnBaseFor, wearOrder, type TryOnState } from "./look";
+import { fullLookUrl, missingSlots, outfitKey, outfitPlan, placePiece, tryOnBaseFor, wearOrder, type TryOnState } from "./look";
 import type { GarmentCategory } from "./types";
 
 const trial = (id: string, category: GarmentCategory, tryOnUrl?: string, tryOnOverUrl?: string): TryOnState => ({
@@ -66,5 +66,18 @@ describe("try-on base for a piece's own verdict", () => {
 
   it("nothing for a piece alone", () => {
     expect(tryOnBaseFor({ top: 0 }, [trial("a", "upper_body", "u:top")], 0)).toBeUndefined();
+  });
+});
+
+describe("full look", () => {
+  const look = { fullUrl: "u:full", fullKey: 'u:outfit|[{"category":"lip_color"}]' };
+
+  it("keeps the makeup made on this outfit", () => {
+    expect(fullLookUrl(look, "u:outfit")).toBe("u:full");
+  });
+
+  it("drops it once the outfit changes", () => {
+    expect(fullLookUrl(look, "u:outfit2")).toBeUndefined();
+    expect(fullLookUrl(look, null)).toBeUndefined();
   });
 });

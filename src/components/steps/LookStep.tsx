@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { checkTryOnFidelity, errorCode, tryOnOutfit } from "@/lib/flow";
 import { missingSlots, outfitKey, outfitPlan, wearOrder } from "@/lib/look";
+import { renderLookCard } from "@/lib/share";
 import { evaluateOutfit, suggestComplement, type OutfitPieces } from "@/lib/verdict/outfit";
 import type { BeautyPrefs, Goal, Slot } from "@/lib/types";
 import type { Look, Me, Trial } from "../ClaraApp";
@@ -16,6 +17,7 @@ import {
   EvidenceList,
   Note,
   OutfitPill,
+  ShareButton,
   SkeletonImage,
   StepHeader,
   Swatch,
@@ -112,6 +114,21 @@ export function LookStep({
     [look.pieces, trials],
   );
   const palette = trials[current]?.result?.palette ?? [];
+  // The portrait and full look as BeautySection shows them: a change of pieces can make them stale.
+  const [shown, setShown] = useState<{ faceUrl?: string; fullUrl?: string }>({});
+
+  const shareCard = () =>
+    renderLookCard({
+      imageUrl: shown.fullUrl ?? outfitUrl!,
+      portraitUrl: shown.faceUrl,
+      pieces: order.map((s) => {
+        const g = pieceOf(s).garment;
+        return { imageUrl: g.isolatedUrl ?? g.originalUrl, hex: g.color.hex, label: `${t(`attr.category.${g.attrs.category}`)} · ${t(`colors.${g.color.name}`)}` };
+      }),
+      outfit: outfit ? { verdict: outfit.verdict, label: t(`look.levels.${outfit.verdict}`) } : undefined,
+      palette,
+      labels: { title: t("look.title"), footer: t("privacy") },
+    });
 
   return (
     <div className="space-y-5">
@@ -243,6 +260,7 @@ export function LookStep({
         outfitHexes={outfitHexes}
         outfitUrl={outfitUrl}
         onUpdateLook={onUpdateLook}
+        onShown={setShown}
       />
 
       <Card className="space-y-4">
@@ -279,6 +297,7 @@ export function LookStep({
         <Button variant="ghost" onClick={onAnother}>
           {t("look.another")}
         </Button>
+        {outfitUrl && !busy && <ShareButton render={shareCard} filename="clara-look.png" />}
         {actions}
       </div>
     </div>

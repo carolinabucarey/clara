@@ -131,7 +131,6 @@ export const es: Dictionary = {
     look: "Ver mi look completo",
     complement: { top: "Agregar parte de arriba", bottom: "Agregar parte de abajo", outer: "Agregar abrigo", full: "Agregar vestido" },
     another: "Probar otra prenda",
-    save: "Guardar el resultado",
     compare: "Comparar prendas",
     tryOnFailed: "El probador no funcionó con esta foto.",
     fidelityWarning:
@@ -161,6 +160,7 @@ export const es: Dictionary = {
     title: "Guarda tu veredicto",
     download: "Descargar imagen",
     share: "Compartir",
+    preparing: "Preparando la imagen…",
     cardTitle: "La segunda opinión de Clara",
   },
   compare: {

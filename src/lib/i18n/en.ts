@@ -129,7 +129,6 @@ export const en = {
     look: "See my full look",
     complement: { top: "Add a top", bottom: "Add a bottom", outer: "Add a layer", full: "Add a dress" },
     another: "Try another piece",
-    save: "Save the result",
     compare: "Compare pieces",
     tryOnFailed: "The try-on didn't work with this photo.",
     fidelityWarning:
@@ -159,6 +158,7 @@ export const en = {
     title: "Save your verdict",
     download: "Download image",
     share: "Share",
+    preparing: "Preparing the image…",
     cardTitle: "Clara's second opinion",
   },
   compare: {
