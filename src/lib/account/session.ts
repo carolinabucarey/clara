@@ -35,7 +35,7 @@ export function useAccount(onUserChange?: (user: User | null) => void): {
 }
 
 export class AccountError extends Error {
-  constructor(public code: "invalidEmail" | "invalidCode" | "rateLimited" | "generic" | "disabled") {
+  constructor(public code: "invalidEmail" | "invalidCode" | "rateLimited" | "emailQuota" | "generic" | "disabled") {
     super(code);
     this.name = "AccountError";
   }
@@ -48,7 +48,11 @@ function client() {
 }
 
 function authError(err: { status?: number; code?: string; message?: string }, fallback: AccountError["code"]) {
-  if (err.status === 429 || /rate/i.test(err.code ?? "")) return new AccountError("rateLimited");
+  // A 429 is either "wait N seconds before another email to this address" or the project's hourly
+  // email cap (a couple per hour on Supabase's built-in mailer), which a minute won't clear.
+  if (err.status === 429 || /rate/i.test(err.code ?? "")) {
+    return new AccountError(/email rate limit/i.test(err.message ?? "") ? "emailQuota" : "rateLimited");
+  }
   if (/email/i.test(err.code ?? "") && /invalid/i.test(err.code ?? err.message ?? "")) return new AccountError("invalidEmail");
   return new AccountError(fallback);
 }
