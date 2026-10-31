@@ -18,6 +18,10 @@ export interface HairTags {
   fringe: boolean;
   waves: boolean;
   layers: boolean;
+  /** A haircut Clara can recommend; updos, braids, accessories and bald stay browse-only. */
+  cut: boolean;
+  /** A statement cut (buzz, combover, afro…): suggested only when a face-shape rule really asks for it. */
+  bold: boolean;
 }
 
 const has = (text: string, re: RegExp) => re.test(text);
@@ -39,16 +43,18 @@ export function tagTemplate(t: Pick<HairTemplate, "title" | "category">): HairTa
           : "any";
   const length: HairTags["length"] = has(text, /\b(long|waist|mermaid|rapunzel)\b/)
     ? "long"
-    : has(text, /\b(pixie|buzz|crew|fade|undercut|crop(ped)?|short|caesar|pompadour|quiff|taper(ed)?|ivy|mohawk|faux ?hawk)\b/)
+    : has(text, /\b(pixie|bixie|buzz|crew ?cut|crew|fade|undercut|crop(ped)?|short|caesar|pompadour|quiff|taper(ed)?|ivy|mohawk|faux ?hawk|comma|comb ?over|bald)\b/)
       ? "short"
       : "medium";
   return {
     group,
     length,
-    volumeTop: has(text, /\b(pompadour|quiff|volume|voluminous|mohawk|faux ?hawk|high|top knot|updo|bouffant)\b/),
+    volumeTop: has(text, /\b(pompadour|quiff|volume|voluminous|mohawk|faux ?hawk|high|top knot|updo|bouffant|textured|bubble)\b/),
     fringe: has(text, /\b(bangs?|fringe|curtain)\b/),
-    waves: has(text, /\b(waves?|wavy|curls?|curly|perm|ringlets?|coils?)\b/),
-    layers: has(text, /\b(layer(ed|s)?|shag|wolf|feather(ed)?|choppy)\b/),
+    waves: has(text, /\b(s-?waves?|waves?|wavy|curls?|curly|perm|ringlets?|coils?|crimp(ed|s)?|beachy|afro)\b/),
+    layers: has(text, /\b(layer(ed|s)?|shag|wolf|feather(ed)?|choppy|face framing|hush|wisps?)\b/),
+    cut: !has(text, /\b(bald|buns?|braids?|updo|pony ?tail|twintails|bows?|accents|headband|dreadlocks)\b/),
+    bold: has(text, /\b(buzz|crew ?cut|crewcut|comb ?over|combover|afro|mohawk|faux ?hawk)\b/),
   };
 }
 
@@ -121,17 +127,19 @@ export function suggestHairstyles(
   n = 3,
 ): HairSuggestion[] {
   const rules = faceShape ? RULES[faceShape] : [];
-  const scored = templatesFor(templates, group).map((t, i) => {
-    const tags = tagTemplate(t);
-    let score = 0;
-    let best: Rule | null = null;
-    for (const r of rules) {
-      if (!r.when(tags)) continue;
-      score += r.points;
-      if (r.points > 0 && (!best || r.points > best.points)) best = r;
-    }
-    return { t, tags, score, best, i };
-  });
+  const scored = templatesFor(templates, group)
+    .map((t, i) => ({ t, tags: tagTemplate(t), i }))
+    .filter(({ tags }) => tags.cut)
+    .map(({ t, tags, i }) => {
+      let score = tags.bold ? -0.75 : 0;
+      let best: Rule | null = null;
+      for (const r of rules) {
+        if (!r.when(tags)) continue;
+        score += r.points;
+        if (r.points > 0 && (!best || r.points > best.points)) best = r;
+      }
+      return { t, tags, score, best, i };
+    });
   scored.sort((a, b) => b.score - a.score || a.i - b.i);
 
   // Prefer variety: no two picks with the same length and fringe when there are alternatives.

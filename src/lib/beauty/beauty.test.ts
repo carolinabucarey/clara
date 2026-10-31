@@ -70,6 +70,28 @@ describe("hairstyle suggestions", () => {
     expect(picks.map((p) => p.templateId)).not.toContain("4");
   });
 
+  it("reads YouCam's real catalog titles and suggests only haircuts", () => {
+    const real: HairTemplate[] = [
+      { id: "female_messy_bun", title: "Messy Bun", thumb: null, category: "Female" },
+      { id: "female_bald", title: "Bald", thumb: null, category: "Female" },
+      { id: "all_bow_accents", title: "Bow Accents", thumb: null, category: "Female" },
+      { id: "all_wavy_bob_bangs", title: "Wavy Bob With Bangs", thumb: null, category: "Female" },
+      { id: "all_face_framing", title: "Face Framing Shag Cut", thumb: null, category: "Female" },
+      { id: "female_crewcut", title: "Crewcut", thumb: null, category: "Female" },
+      { id: "male_textured_crop", title: "Textured Crop", thumb: null, category: "Male" },
+    ];
+    expect(tagTemplate(real[0]).cut).toBe(false);
+    expect(tagTemplate(real[3])).toMatchObject({ group: "feminine", fringe: true, waves: true, cut: true });
+    expect(tagTemplate(real[4]).layers).toBe(true);
+    expect(tagTemplate(real[5]).length).toBe("short");
+    expect(tagTemplate(real[6])).toMatchObject({ group: "masculine", length: "short", volumeTop: true });
+    const picks = suggestHairstyles(real, "oblong", "feminine").map((p) => p.templateId);
+    expect(picks).not.toContain("female_messy_bun");
+    expect(picks).not.toContain("female_bald");
+    expect(picks).not.toContain("all_bow_accents");
+    expect(picks[0]).toBe("all_wavy_bob_bangs");
+  });
+
   it("still suggests something without a face shape", () => {
     const picks = suggestHairstyles(catalog, null, "feminine");
     expect(picks).toHaveLength(3);
