@@ -9,6 +9,8 @@ export interface HairTemplate {
   title: string;
   thumb: string | null;
   category: string | null;
+  /** Recolors the hair whatever we ask (YouCam's keep_users_color is false). */
+  changesColor?: boolean;
 }
 
 export interface HairTags {
@@ -119,7 +121,10 @@ export function templatesFor(templates: HairTemplate[], group: HairStyleGroup): 
   return templates.filter((t) => matchesGroup(tagTemplate(t), group));
 }
 
-/** The best `n` templates for this face shape, each with the rule that earned its place. */
+/**
+ * The best `n` templates for this face shape, each with the rule that earned its place.
+ * Clara suggests cuts, never a new hair color: templates that recolor are left out.
+ */
 export function suggestHairstyles(
   templates: HairTemplate[],
   faceShape: FaceShape | null,
@@ -129,7 +134,7 @@ export function suggestHairstyles(
   const rules = faceShape ? RULES[faceShape] : [];
   const scored = templatesFor(templates, group)
     .map((t, i) => ({ t, tags: tagTemplate(t), i }))
-    .filter(({ tags }) => tags.cut)
+    .filter(({ t, tags }) => tags.cut && !t.changesColor)
     .map(({ t, tags, i }) => {
       let score = tags.bold ? -0.75 : 0;
       let best: Rule | null = null;

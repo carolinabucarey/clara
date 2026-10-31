@@ -211,6 +211,7 @@ export const es: Dictionary = {
     hairTitle: "Cortes para tu rostro",
     keepHair: "Mantener mi peinado",
     moreHair: "Ver más cortes",
+    changesColor: "Cambia tu color",
     lessHair: "Ver menos",
     hairLoading: "Cargando cortes…",
     hairUnavailable: "Los cortes no están disponibles ahora.",

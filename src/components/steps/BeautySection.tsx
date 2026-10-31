@@ -12,11 +12,13 @@ import { Button, Card, ChipSelect, cx, ErrorNote, Note, SkeletonImage, Spinner }
 
 function HairTile({
   label,
+  note,
   thumb,
   selected,
   onClick,
 }: {
   label: string;
+  note?: string;
   thumb: string | null;
   selected: boolean;
   onClick: () => void;
@@ -33,6 +35,7 @@ function HairTile({
         {thumb && <img src={thumb} alt="" className="h-full w-full object-cover" />}
       </span>
       <span className="mt-1 block truncate text-xs text-ink">{label}</span>
+      {note && <span className="block truncate text-[11px] text-muted">{note}</span>}
     </button>
   );
 }
@@ -194,6 +197,7 @@ export function BeautySection({
                     <HairTile
                       key={c.id}
                       label={c.title}
+                      note={c.changesColor ? t("beauty.changesColor") : undefined}
                       thumb={c.thumb}
                       selected={chosen === c.id}
                       onClick={() => onUpdateLook({ hairTemplateId: c.id })}

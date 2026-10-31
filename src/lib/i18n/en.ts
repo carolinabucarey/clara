@@ -209,6 +209,7 @@ export const en = {
     hairTitle: "Haircuts for your face",
     keepHair: "Keep my hair",
     moreHair: "See more haircuts",
+    changesColor: "Changes your color",
     lessHair: "Show fewer",
     hairLoading: "Loading haircuts…",
     hairUnavailable: "Haircuts aren't available right now.",

@@ -127,6 +127,8 @@ export interface Template {
   title: string;
   thumb: string | null;
   category: string | null;
+  /** The template brings its own hair color: YouCam ignores `hair_color: "src"` for it. */
+  changesColor: boolean;
 }
 
 /** Preset templates of a feature (hairstyles), following YouCam's next_token pagination. */
@@ -146,6 +148,7 @@ export async function listTemplates(feature: Feature, maxPages = 20): Promise<Te
         title: typeof t.title === "string" ? t.title : "",
         thumb: typeof t.thumb === "string" ? t.thumb : null,
         category: typeof t.category_name === "string" ? t.category_name : null,
+        changesColor: t.keep_users_color === false,
       });
     }
     token = res.data?.next_token ?? null;

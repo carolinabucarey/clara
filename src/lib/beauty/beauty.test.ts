@@ -92,6 +92,17 @@ describe("hairstyle suggestions", () => {
     expect(picks[0]).toBe("all_wavy_bob_bangs");
   });
 
+  it("never suggests a template that recolors the hair", () => {
+    const real: HairTemplate[] = [
+      { id: "all_steel_blonde_bob", title: "Steel Blonde Bob", thumb: null, category: "Female", changesColor: true },
+      { id: "all_bobcut", title: "Bobcut", thumb: null, category: "Female", changesColor: false },
+      { id: "female_long_straight", title: "Long Straight", thumb: null, category: "Female", changesColor: false },
+    ];
+    const picks = suggestHairstyles(real, "heart", "feminine").map((p) => p.templateId);
+    expect(picks).toEqual(["all_bobcut", "female_long_straight"]);
+    expect(templatesFor(real, "feminine")).toHaveLength(3);
+  });
+
   it("still suggests something without a face shape", () => {
     const picks = suggestHairstyles(catalog, null, "feminine");
     expect(picks).toHaveLength(3);
