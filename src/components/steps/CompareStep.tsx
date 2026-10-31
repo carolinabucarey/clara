@@ -1,26 +1,28 @@
 "use client";
 
 import { useI18n } from "@/lib/i18n/context";
+import { slotFor, type Slot } from "@/lib/types";
 import type { Trial } from "../ClaraApp";
 import { Card, StepHeader, VerdictPill } from "../ui";
 
 const SCORE = { flatters: 2, works_with_tweaks: 1, not_flattering: 0 } as const;
 
-export function CompareStep({ trials, onOpen }: { trials: Trial[]; onOpen: (i: number) => void }) {
+/** Trials with a verdict that fill `slot`: only alternatives to each other are worth comparing. */
+export const comparable = (trials: Trial[], slot: Slot) =>
+  trials.map((tr, i) => ({ tr, i })).filter(({ tr }) => tr.result && slotFor(tr.garment.attrs.category) === slot);
+
+export function CompareStep({ trials, slot, onOpen }: { trials: Trial[]; slot: Slot; onOpen: (i: number) => void }) {
   const { t, locale } = useI18n();
-  const scored = trials
-    .map((tr, i) => ({ tr, i }))
-    .filter(({ tr }) => tr.result)
-    .map(({ tr, i }) => ({
-      tr,
-      i,
-      score: SCORE[tr.result!.cut.verdict] + SCORE[tr.result!.color.verdict] + (tr.result!.cut.score + tr.result!.color.score) / 100,
-    }));
+  const scored = comparable(trials, slot).map(({ tr, i }) => ({
+    tr,
+    i,
+    score: SCORE[tr.result!.cut.verdict] + SCORE[tr.result!.color.verdict] + (tr.result!.cut.score + tr.result!.color.score) / 100,
+  }));
   const best = scored.reduce<number | null>((b, s) => (b === null || s.score > scored.find((x) => x.i === b)!.score ? s.i : b), null);
 
   return (
     <div className="space-y-5">
-      <StepHeader title={t("compare.title")} subtitle={t("compare.subtitle")} />
+      <StepHeader title={t("compare.title")} subtitle={t(`compare.subtitle.${slot}`)} />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {scored.map(({ tr, i }) => (
           <button key={tr.garment.id} onClick={() => onOpen(i)} className="text-left">

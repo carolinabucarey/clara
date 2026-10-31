@@ -35,6 +35,7 @@ export const es: Dictionary = {
     subtitle:
       "Sirve una captura de cualquier tienda o de Instagram. Te la pruebo y te digo con franqueza si su corte y su color te favorecen.",
     upload: "Subir la prenda",
+    paste: "Pegar la foto",
     replace: "Usar otra foto",
     linkLabel: "O pega el link de la tienda",
     linkGo: "Traer",
@@ -158,7 +159,12 @@ export const es: Dictionary = {
   },
   compare: {
     title: "¿Esta o esta?",
-    subtitle: "Las prendas que probaste en esta sesión, lado a lado.",
+    subtitle: {
+      top: "Las partes de arriba que probaste en esta sesión, lado a lado.",
+      bottom: "Las partes de abajo que probaste en esta sesión, lado a lado.",
+      full: "Los vestidos que probaste en esta sesión, lado a lado.",
+      outer: "Los abrigos que probaste en esta sesión, lado a lado.",
+    },
     pick: "Mi elección",
     best: "La elección de Clara",
   },
@@ -611,7 +617,10 @@ export const es: Dictionary = {
     baseExpired: "La prueba anterior expiró. Inténtalo de nuevo.",
     linkInvalid: "Ese link no funciona. Pega la dirección completa de la página del producto (https://…).",
     linkUnreachable: "No pude abrir esa página. Inténtalo de nuevo o sube una captura de la prenda.",
-    linkBlocked: "Esta tienda no me deja abrir sus páginas. Sube una captura de la prenda.",
+    linkBlocked:
+      "Esta tienda no me deja abrir sus páginas. Copia ahí la foto del producto (clic derecho → Copiar imagen, o mantenla presionada → Copiar) y pégala aquí, o sube una captura.",
     linkNoImage: "No encontré la foto del producto en esa página. Sube una captura de la prenda.",
+    pasteNoImage:
+      "No hay una foto para pegar. En la página de la tienda, haz clic derecho en la foto → Copiar imagen (en el celular, mantenla presionada → Copiar) y pégala aquí.",
   },
 };

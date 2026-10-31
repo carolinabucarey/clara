@@ -33,6 +33,7 @@ export const en = {
     subtitle:
       "A screenshot from any store or from Instagram works. I'll try it on you and tell you honestly whether its cut and color work for you.",
     upload: "Upload the garment",
+    paste: "Paste the photo",
     replace: "Use another photo",
     linkLabel: "Or paste the store link",
     linkGo: "Bring it",
@@ -156,7 +157,12 @@ export const en = {
   },
   compare: {
     title: "Which one?",
-    subtitle: "The pieces you tried in this session, side by side.",
+    subtitle: {
+      top: "The tops you tried in this session, side by side.",
+      bottom: "The bottoms you tried in this session, side by side.",
+      full: "The dresses you tried in this session, side by side.",
+      outer: "The layers you tried in this session, side by side.",
+    },
     pick: "My pick",
     best: "Clara's pick",
   },
@@ -606,8 +612,11 @@ export const en = {
     baseExpired: "The earlier try-on expired. Try again.",
     linkInvalid: "That link doesn't work. Paste the full address of the product page (https://…).",
     linkUnreachable: "I couldn't open that page. Try again, or upload a screenshot of the piece.",
-    linkBlocked: "This store doesn't let me open its pages. Upload a screenshot of the piece instead.",
+    linkBlocked:
+      "This store doesn't let me open its pages. Copy the product photo there (right-click → Copy image, or press and hold → Copy) and paste it here, or upload a screenshot.",
     linkNoImage: "I didn't find the product photo on that page. Upload a screenshot of the piece instead.",
+    pasteNoImage:
+      "There's no photo to paste. On the store page, right-click the photo → Copy image (on a phone, press and hold it → Copy), then paste it here.",
   },
 };
 
