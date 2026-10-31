@@ -32,7 +32,7 @@ import { PhotosStep } from "./steps/PhotosStep";
 import { ProfileStep } from "./steps/ProfileStep";
 import { VerdictStep } from "./steps/VerdictStep";
 import { LookStep } from "./steps/LookStep";
-import { CompareStep } from "./steps/CompareStep";
+import { comparable, CompareStep } from "./steps/CompareStep";
 import { MyLooksStep } from "./steps/MyLooksStep";
 
 export type Step = "garment" | "photos" | "profile" | "verdict" | "look" | "compare" | "looks";
@@ -650,7 +650,7 @@ export function ClaraApp() {
             onUpdate={(patch) => updateTrial(patch)}
             onLook={() => setStep("look")}
             onAnother={() => newPiece()}
-            onCompare={trials.filter((tr) => tr.result).length > 1 ? () => setStep("compare") : undefined}
+            onCompare={comparable(trials, slotFor(trial.garment.attrs.category)).length > 1 ? () => setStep("compare") : undefined}
             onEditGarment={() => setStep("garment")}
           />
         )}
@@ -696,9 +696,10 @@ export function ClaraApp() {
             }}
           />
         )}
-        {step === "compare" && (
+        {step === "compare" && trial && (
           <CompareStep
             trials={trials}
+            slot={slotFor(trial.garment.attrs.category)}
             onOpen={(i) => {
               openTrial(i);
               setStep("verdict");

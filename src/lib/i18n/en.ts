@@ -157,7 +157,12 @@ export const en = {
   },
   compare: {
     title: "Which one?",
-    subtitle: "The pieces you tried in this session, side by side.",
+    subtitle: {
+      top: "The tops you tried in this session, side by side.",
+      bottom: "The bottoms you tried in this session, side by side.",
+      full: "The dresses you tried in this session, side by side.",
+      outer: "The layers you tried in this session, side by side.",
+    },
     pick: "My pick",
     best: "Clara's pick",
   },

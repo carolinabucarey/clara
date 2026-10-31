@@ -159,7 +159,12 @@ export const es: Dictionary = {
   },
   compare: {
     title: "¿Esta o esta?",
-    subtitle: "Las prendas que probaste en esta sesión, lado a lado.",
+    subtitle: {
+      top: "Las partes de arriba que probaste en esta sesión, lado a lado.",
+      bottom: "Las partes de abajo que probaste en esta sesión, lado a lado.",
+      full: "Los vestidos que probaste en esta sesión, lado a lado.",
+      outer: "Los abrigos que probaste en esta sesión, lado a lado.",
+    },
     pick: "Mi elección",
     best: "La elección de Clara",
   },
