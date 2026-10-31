@@ -2,7 +2,7 @@
 // title and a category, so each template is tagged from its words (length, fringe,
 // volume, waves…), then scored with face-shape rules that read as goals.
 
-import type { FaceShape, HairStyleGroup, HairSuggestion } from "../types";
+import type { Evidence, FaceShape, HairStyleGroup, HairSuggestion, Verdict } from "../types";
 
 export interface HairTemplate {
   id: string;
@@ -112,6 +112,31 @@ const RULES: Record<FaceShape, Rule[]> = {
   ],
 };
 
+/** The face-shape rules a cut meets, and their total. */
+function faceFit(tags: HairTags, faceShape: FaceShape | null) {
+  const met = faceShape ? RULES[faceShape].filter((r) => r.when(tags)) : [];
+  return { met, score: met.reduce((sum, r) => sum + r.points, 0) };
+}
+
+/**
+ * Whether a cut suits this face shape, by the same rules that pick the suggestions:
+ * each rule it meets is a + or − line, and a cut that meets none is a matter of taste.
+ */
+export function judgeHairstyle(
+  t: Pick<HairTemplate, "title" | "category">,
+  faceShape: FaceShape,
+): { verdict: Verdict; evidence: Evidence[] } {
+  const { met, score } = faceFit(tagTemplate(t), faceShape);
+  const params = { shape: faceShape };
+  const evidence = [...met]
+    .sort((a, b) => b.points - a.points)
+    .map((r): Evidence => ({ code: r.code, polarity: r.points > 0 ? "plus" : "minus", params }));
+  if (evidence.length === 0) evidence.push({ code: "shape_no_effect", polarity: "neutral", params });
+  const verdict: Verdict =
+    score < 0 ? "not_flattering" : score > 0 && met.every((r) => r.points > 0) ? "flatters" : "works_with_tweaks";
+  return { verdict, evidence };
+}
+
 export function matchesGroup(tags: HairTags, group: HairStyleGroup): boolean {
   return group === "all" || tags.group === "any" || tags.group === group;
 }
@@ -131,19 +156,13 @@ export function suggestHairstyles(
   group: HairStyleGroup,
   n = 3,
 ): HairSuggestion[] {
-  const rules = faceShape ? RULES[faceShape] : [];
   const scored = templatesFor(templates, group)
     .map((t, i) => ({ t, tags: tagTemplate(t), i }))
     .filter(({ t, tags }) => tags.cut && !t.changesColor)
     .map(({ t, tags, i }) => {
-      let score = tags.bold ? -0.75 : 0;
-      let best: Rule | null = null;
-      for (const r of rules) {
-        if (!r.when(tags)) continue;
-        score += r.points;
-        if (r.points > 0 && (!best || r.points > best.points)) best = r;
-      }
-      return { t, tags, score, best, i };
+      const fit = faceFit(tags, faceShape);
+      const best = fit.met.filter((r) => r.points > 0).sort((a, b) => b.points - a.points)[0] ?? null;
+      return { t, tags, score: fit.score + (tags.bold ? -0.75 : 0), best, i };
     });
   scored.sort((a, b) => b.score - a.score || a.i - b.i);
 

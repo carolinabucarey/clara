@@ -3,7 +3,7 @@ import { buildColorProfile } from "../color/profile";
 import { PARAM_SCHEMAS } from "../youcam/features";
 import { readFaceShape } from "../youcam/browser";
 import { makeupEffects, makeupFor } from "./makeup";
-import { suggestHairstyles, tagTemplate, templatesFor, type HairTemplate } from "./hairstyles";
+import { judgeHairstyle, suggestHairstyles, tagTemplate, templatesFor, type HairTemplate } from "./hairstyles";
 
 const warm = buildColorProfile({ skin: "#d9a98a", hair: "#3b2a20", eye: "#4a3426" });
 
@@ -101,6 +101,27 @@ describe("hairstyle suggestions", () => {
     const picks = suggestHairstyles(real, "heart", "feminine").map((p) => p.templateId);
     expect(picks).toEqual(["all_bobcut", "female_long_straight"]);
     expect(templatesFor(real, "feminine")).toHaveLength(3);
+  });
+
+  it("says whether any chosen cut flatters the face, with its reasons", () => {
+    const cut = (title: string) => ({ title, category: "Female" });
+    expect(judgeHairstyle(cut("Wavy Bob With Bangs"), "oblong")).toMatchObject({
+      verdict: "flatters",
+      evidence: [
+        { code: "oblong_fringe", polarity: "plus" },
+        { code: "oblong_width", polarity: "plus" },
+      ],
+    });
+    expect(judgeHairstyle(cut("Long Straight"), "oblong")).toMatchObject({
+      verdict: "not_flattering",
+      evidence: [{ code: "oblong_long_straight", polarity: "minus" }],
+    });
+    // Ahead on balance but with a catch: it works, with tweaks.
+    expect(judgeHairstyle(cut("Long Straight Fringe"), "oblong").verdict).toBe("works_with_tweaks");
+    expect(judgeHairstyle(cut("Pixie"), "round")).toMatchObject({
+      verdict: "works_with_tweaks",
+      evidence: [{ code: "shape_no_effect", polarity: "neutral", params: { shape: "round" } }],
+    });
   });
 
   it("still suggests something without a face shape", () => {

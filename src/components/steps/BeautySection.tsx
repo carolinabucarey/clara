@@ -4,11 +4,11 @@ import { useMemo, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { applyHairstyle, applyLookOnBody, applyMakeupLook, errorCode } from "@/lib/flow";
 import { makeupEffects, makeupFor } from "@/lib/beauty/makeup";
-import { suggestHairstyles, templatesFor } from "@/lib/beauty/hairstyles";
+import { judgeHairstyle, suggestHairstyles, templatesFor } from "@/lib/beauty/hairstyles";
 import { useHairTemplates } from "@/lib/beauty/templates";
 import type { BeautyPrefs, HairStyleGroup } from "@/lib/types";
 import type { Look, Me } from "../ClaraApp";
-import { Button, Card, ChipSelect, cx, ErrorNote, Note, SkeletonImage, Spinner } from "../ui";
+import { Button, Card, ChipSelect, cx, ErrorNote, EvidenceList, Note, SkeletonImage, Spinner, VerdictPill } from "../ui";
 
 function HairTile({
   label,
@@ -74,6 +74,8 @@ export function BeautySection({
   const catalog = useMemo(() => (templates ? templatesFor(templates, beauty.hair) : []), [templates, beauty.hair]);
   const chosen = look.hairTemplateId === undefined ? (suggestions[0]?.templateId ?? null) : look.hairTemplateId;
   const chosenSuggestion = suggestions.find((s) => s.templateId === chosen);
+  const chosenTemplate = templates?.find((x) => x.id === chosen);
+  const hairFit = chosenTemplate && faceShape ? judgeHairstyle(chosenTemplate, faceShape) : null;
   const titleOf = (id: string) => templates?.find((x) => x.id === id)?.title ?? "";
 
   const steps = useMemo(
@@ -181,8 +183,19 @@ export function BeautySection({
                 />
               ))}
             </div>
-            {chosenSuggestion && (
-              <p className="text-sm leading-relaxed text-ink/80">{tl(`beauty.hairWhy.${chosenSuggestion.code}`, chosenSuggestion.params)}</p>
+            {chosenTemplate && (
+              <div className="space-y-2 rounded-2xl bg-cream px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-ink">{chosenTemplate.title}</span>
+                  {hairFit && <VerdictPill verdict={hairFit.verdict} size="sm" />}
+                </div>
+                {hairFit ? (
+                  <EvidenceList items={hairFit.evidence} render={(e) => tl(`beauty.hairWhy.${e.code}`, e.params)} />
+                ) : (
+                  <p className="text-sm text-muted">{t("beauty.fitNoShape")}</p>
+                )}
+                {chosenTemplate.changesColor && <p className="text-xs text-muted">{t("beauty.colorNote")}</p>}
+              </div>
             )}
             {catalog.length > suggestions.length && (
               <button className="text-sm font-semibold text-clay underline-offset-4 hover:underline" onClick={() => setShowAll((v) => !v)}>
