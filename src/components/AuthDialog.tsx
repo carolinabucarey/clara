@@ -8,7 +8,8 @@ import { Button, ErrorNote } from "./ui";
 const input = "h-11 w-full rounded-xl border border-line bg-paper px-3 text-base text-ink focus:border-ink focus:outline-none";
 
 /**
- * Sign in without leaving the page: an emailed 6-digit code, or Google in a popup.
+ * Sign in without leaving the page: an email link (opened in another tab) or code,
+ * or Google in a popup.
  * When opened to save a look, it also asks whether to keep the photos.
  */
 export function AuthDialog({
@@ -87,7 +88,7 @@ export function AuthDialog({
           </label>
         ) : (
           <div className="space-y-2">
-            <p className="text-sm text-muted">{t("account.codeSent", { email })}</p>
+            <p className="rounded-2xl bg-sage-soft px-3 py-2.5 text-sm text-ink">{t("account.linkSent", { email })}</p>
             <label className="block space-y-1.5">
               <span className="text-sm font-semibold">{t("account.code")}</span>
               <input
@@ -95,7 +96,6 @@ export function AuthDialog({
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 pattern="[0-9]{6,8}"
-                required
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
               />
@@ -131,7 +131,7 @@ export function AuthDialog({
           <Button type="button" variant="ghost" onClick={onClose}>
             {t("account.cancel")}
           </Button>
-          <Button type="submit" disabled={busy}>
+          <Button type="submit" disabled={busy || (sent && code.length < 6)}>
             {sent ? t("account.verify") : t("account.sendCode")}
           </Button>
         </div>

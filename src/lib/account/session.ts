@@ -1,7 +1,7 @@
 "use client";
 
-// Who is signed in, and the sign-in methods: an emailed 6-digit code (stays on the
-// page, so nothing in progress is lost) or Google in a popup.
+// Who is signed in, and the sign-in methods: an email (a link, or a 6-digit code when
+// the template includes one) or Google in a popup. Both keep this page as it is.
 
 import { useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
@@ -55,7 +55,12 @@ function authError(err: { status?: number; code?: string; message?: string }, fa
 
 export async function sendEmailCode(email: string) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new AccountError("invalidEmail");
-  const { error } = await client().auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+  // Supabase's default email (no custom SMTP) carries a link, not a code: the link opens /auth/callback
+  // in a new tab of this browser and the session reaches this tab, so nothing in progress is lost.
+  const { error } = await client().auth.signInWithOtp({
+    email,
+    options: { shouldCreateUser: true, emailRedirectTo: `${window.location.origin}/auth/callback` },
+  });
   if (error) throw authError(error, "generic");
 }
 
