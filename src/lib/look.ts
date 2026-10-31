@@ -57,6 +57,14 @@ export function outfitKey(pieces: Pieces, trials: TryOnState[], bodyUrl: string)
 }
 
 /**
+ * The makeup on the full-body photo, while it was made on this outfit: its key starts
+ * with the outfit image it was applied to (BeautySection), so a change of pieces drops it.
+ */
+export function fullLookUrl(look: { fullUrl?: string; fullKey?: string }, outfitUrl: string | null | undefined): string | undefined {
+  return outfitUrl && look.fullKey?.startsWith(`${outfitUrl}|`) ? look.fullUrl : undefined;
+}
+
+/**
  * How to get the outfit image with the fewest try-ons: start from a result that
  * already shows two pieces together, or from any single try-on, and apply the rest.
  */
