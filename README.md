@@ -20,7 +20,8 @@ answers "how does this look on me?" with an honest, explained verdict.
 
 ## How it works
 
-1. **The piece.** Upload a screenshot or product photo. YouCam **background removal** isolates the garment
+1. **The piece.** Upload a screenshot or product photo, or paste the store link: Clara reads the page's product
+   photos (schema.org JSON-LD, then `og:image`) and the person picks the clearest one. YouCam **background removal** isolates the garment
    and Clara measures its dominant color (k-means in CIELAB). Claude (vision) pre-fills its type, neckline,
    length and fit as chips the user confirms or corrects.
 2. **You.** A selfie and a full-body photo plus your height. YouCam **Facial Color Tones Analyzer** measures
@@ -44,10 +45,13 @@ answers "how does this look on me?" with an honest, explained verdict.
 8. **Hair and makeup.** YouCam **AI Face Analyzer** reads the face shape once; Clara suggests three haircuts
    from YouCam's **AI Hairstyle** catalog with the reason for each, and, if the person wants it, a makeup look
    (blush, eyes, liner, lips) from their undertone, depth and contrast that lets the outfit's color lead. Both
-   are tried on a head-and-shoulders crop of the selfie, before/after. The person chooses which haircut styles
-   to see and whether to see makeup: Clara never guesses gender.
+   are tried on a head-and-shoulders crop of the selfie, before/after. The makeup (not the haircut, which never
+   blended in) can also be put on the full-body outfit photo: the head is cropped, enlarged, made up and pasted
+   back, since the face there is too small for YouCam.
+   The person chooses which haircut styles to see and whether to see makeup: Clara never guesses gender.
 9. **Compare and save.** "Which one?" ranks the pieces tried in the session; the verdict can be downloaded or
-   shared as an image card. With an account, looks (and, with consent, the profile) are saved.
+   shared as an image card. With an account, looks (and, with consent, the profile) are saved, and a saved look
+   can be reopened, changed (pieces, haircut, makeup) and saved again.
 
 ## YouCam APIs used
 
@@ -88,9 +92,10 @@ Browser (Next.js client)                 Server (Next.js route handlers)        
   (proportions, locally)                 /api/youcam/image (result proxy)          makeup-vto, sod
 - color k-means on the garment           /api/youcam/hair-templates               hair-transfer
 - outfit, makeup, haircut rules          /api/garment  (Claude vision)             face-attr-analysis
+                                         /api/garment/link (store page → product photos, SSRF-guarded)
 - wizard UI, share card             ◀──  /api/verdict  (rules → Claude text)
         │                                /api/account  (DELETE, service role)
-        └── supabase-js (RLS) ──▶  Supabase: Auth (email code, Google), Postgres, Storage
+        └── supabase-js (RLS) ──▶  Supabase: Auth (email link), Postgres, Storage
 ```
 
 - `src/lib/youcam/` — server client (`client.ts`), routes helpers, error mapping, dev-only result cache.
@@ -130,12 +135,13 @@ npm run dev
 ### Accounts (Supabase)
 
 1. Create a Supabase project (the Vercel Marketplace integration also sets the three variables in Vercel).
-2. Run `supabase/migrations/0001_accounts.sql` (SQL editor, or `supabase db push`).
-3. *Authentication → Email Templates → Magic Link*: include `{{ .Token }}` so the email carries the 6-digit code
-   Clara asks for (signing in never leaves the page, so nothing in progress is lost).
-4. *Authentication → URL Configuration*: add your site URL and `<site>/auth/callback` as a redirect URL.
-5. Optional: *Authentication → Providers → Google* with an OAuth client from Google Cloud. Google sign-in opens
-   in a popup and finishes on `/auth/callback`.
+2. Run the files in `supabase/migrations/` in order (SQL editor, or `supabase db push`).
+3. *Authentication → URL Configuration*: set the site URL and add `<site>/auth/callback` as a redirect URL.
+   Sign-in is an email link: opened in a new tab of the same browser, it finishes on `/auth/callback` and the
+   session reaches the Clara tab, so nothing in progress is lost.
+4. Optional, for production: Supabase's built-in email sends only a few messages per hour. Set up custom SMTP
+   (for example Resend); that also unlocks the email templates, and adding `{{ .Token }}` to the Magic Link
+   template lets people type a 6-digit code in Clara instead of opening the link.
 
 ### Tests
 
@@ -164,4 +170,7 @@ one-tap examples on the first screen.
   presents it as style advice.
 - The try-on image can alter details of the face or body; the verdict relies on measurements, not on the generated image.
 - An outfit is built by chaining one-category try-ons, so each extra piece is another generation step.
-- Haircuts and makeup are tried on the selfie, not on the full-body photo: the face there is too small for them.
+- On the full-body photo, the makeup goes through a crop that is enlarged and pasted back, so the face looks
+  softer than in the selfie portrait.
+- Store links work when the page publishes its product photos (JSON-LD or `og:image`); pages that only render
+  them with JavaScript or block automated requests need a screenshot instead.

@@ -109,6 +109,7 @@ export function LookStep({
   return (
     <div className="space-y-5">
       <StepHeader title={t("look.title")} subtitle={t("look.subtitle")} />
+      {look.saved && <Note>{t("looks.editing")}</Note>}
 
       <Card className="space-y-4">
         <h2 className="font-display text-xl text-ink">{t("look.outfit")}</h2>
@@ -155,6 +156,11 @@ export function LookStep({
                       <button className="text-clay underline-offset-4 hover:underline" onClick={() => onOpenPiece(index)}>
                         {t("verdict.title")}
                       </button>
+                      {g.source && (
+                        <a href={g.source.url} target="_blank" rel="noopener noreferrer" className="text-clay underline-offset-4 hover:underline">
+                          {t("look.store")}
+                        </a>
+                      )}
                       {multi && (
                         <button className="text-muted underline-offset-4 hover:text-ink hover:underline" onClick={() => onRemovePiece(s)}>
                           {t("look.remove")}
@@ -223,7 +229,15 @@ export function LookStep({
         )}
       </Card>
 
-      <BeautySection me={me} look={look} beauty={beauty} onBeauty={onBeauty} outfitHexes={outfitHexes} onUpdateLook={onUpdateLook} />
+      <BeautySection
+        me={me}
+        look={look}
+        beauty={beauty}
+        onBeauty={onBeauty}
+        outfitHexes={outfitHexes}
+        outfitUrl={outfitUrl}
+        onUpdateLook={onUpdateLook}
+      />
 
       <Card className="space-y-4">
         <h2 className="font-display text-xl text-ink">{t("look.rescueTitle")}</h2>

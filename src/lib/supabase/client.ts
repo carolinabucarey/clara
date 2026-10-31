@@ -9,11 +9,18 @@ export const BUCKET = "clara";
 
 let client: SupabaseClient | null | undefined;
 
-export function supabase(): SupabaseClient | null {
-  if (client !== undefined) return client;
+function supabaseConfig(): { url: string; key: string } | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  // PKCE so the Google popup can finish the sign-in on /auth/callback and the main tab picks it up.
-  client = url && key ? createClient(url, key, { auth: { flowType: "pkce", persistSession: true, detectSessionInUrl: true } }) : null;
+  return url && key ? { url, key } : null;
+}
+
+export function supabase(): SupabaseClient | null {
+  if (client !== undefined) return client;
+  const config = supabaseConfig();
+  // PKCE so the email link finishes on /auth/callback in another tab and this tab picks up the session.
+  client = config
+    ? createClient(config.url, config.key, { auth: { flowType: "pkce", persistSession: true, detectSessionInUrl: true } })
+    : null;
   return client;
 }

@@ -61,6 +61,15 @@ describe("garment color", () => {
     expect(name("#cc1f1f")).toBe("red");
     expect(name("#2e8b57")).toBe("green");
   });
+  it("names muted reddish browns brown, not red", () => {
+    const name = (hex: string) => {
+      const c = hexToLch(hex);
+      return colorName(c.L, c.C, c.h);
+    };
+    expect(name("#7b615b")).toBe("brown");
+    expect(name("#6f4e37")).toBe("brown");
+    expect(name("#b03a2e")).toBe("red");
+  });
   it("describes temperature, value and chroma", () => {
     const camel = describeGarmentColor("#c19a6b");
     expect(camel.temperature).toBe("warm");

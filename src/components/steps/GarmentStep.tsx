@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
-import { analyzeGarment, errorCode, type GarmentAnalysis } from "@/lib/flow";
+import { analyzeGarment, errorCode, FlowError, type GarmentAnalysis } from "@/lib/flow";
 import { describeGarmentColor } from "@/lib/color/garment";
 import {
   FITS,
@@ -48,6 +48,9 @@ export function GarmentStep({
   const [error, setError] = useState<string | null>(null);
   const [lastFile, setLastFile] = useState<Blob | null>(null);
   const [demos, setDemos] = useState<DemoGarment[]>([]);
+  const [link, setLink] = useState("");
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkFound, setLinkFound] = useState<{ url: string; title: string | null; images: string[] } | null>(null);
 
   useEffect(() => {
     fetch("/demo/garments.json")
@@ -56,7 +59,7 @@ export function GarmentStep({
       .catch(() => setDemos([]));
   }, []);
 
-  const run = async (file: Blob) => {
+  const run = async (file: Blob, source?: GarmentAnalysis["source"]) => {
     setLastFile(file);
     setError(null);
     setAnalysis(null);
@@ -64,7 +67,7 @@ export function GarmentStep({
     try {
       const read = await analyzeGarment(file, (s) => setStage(s));
       // The person said what this piece is: trust that over the automatic reading.
-      const a = complement ? { ...read, attrs: { ...read.attrs, category: SLOT_CATEGORY[complement] } } : read;
+      const a = { ...(complement ? { ...read, attrs: { ...read.attrs, category: SLOT_CATEGORY[complement] } } : read), source };
       setAnalysis(a);
       setAttrs(a.attrs);
       setColorHex(a.color.hex);
@@ -72,6 +75,47 @@ export function GarmentStep({
       setError(t(`errors.${errorCode(e)}`));
     } finally {
       setStage("idle");
+    }
+  };
+
+  /** A product photo from the store page, through our same-origin proxy. */
+  const pickLinkImage = async (src: string, found: { url: string; title: string | null }) => {
+    setLinkBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/garment/link?image=${encodeURIComponent(src)}`);
+      if (!res.ok) throw new FlowError("linkNoImage");
+      setLinkFound(null);
+      void run(await res.blob(), found);
+    } catch (e) {
+      setError(t(`errors.${errorCode(e)}`));
+    } finally {
+      setLinkBusy(false);
+    }
+  };
+
+  const submitLink = async () => {
+    const url = link.trim();
+    if (!url) return;
+    setLinkBusy(true);
+    setError(null);
+    setLinkFound(null);
+    try {
+      const res = await fetch("/api/garment/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; title?: string | null; images?: string[] };
+      if (!res.ok || !data.images?.length) throw new FlowError(data.error ?? "linkUnreachable");
+      const found = { url, title: data.title ?? null, images: data.images };
+      setLinkBusy(false);
+      // One photo: straight to the analysis. Several: let the person pick the clearest one.
+      if (found.images.length === 1) await pickLinkImage(found.images[0], found);
+      else setLinkFound(found);
+    } catch (e) {
+      setError(t(`errors.${errorCode(e)}`));
+      setLinkBusy(false);
     }
   };
 
@@ -108,7 +152,54 @@ export function GarmentStep({
           <div className="text-5xl" aria-hidden>
             👗
           </div>
-          <FilePicker label={t("garment.upload")} onFile={run} />
+          <FilePicker label={t("garment.upload")} onFile={(f) => run(f)} />
+          <form
+            className="w-full space-y-2 pt-2 text-left"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void submitLink();
+            }}
+          >
+            <label htmlFor="garment-link" className="block text-center text-sm text-muted">
+              {t("garment.linkLabel")}
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="garment-link"
+                type="url"
+                inputMode="url"
+                placeholder="https://"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                className="h-11 min-w-0 flex-1 rounded-xl border border-line bg-paper px-3 text-base text-ink focus:border-ink focus:outline-none"
+              />
+              <Button type="submit" variant="secondary" disabled={!link.trim() || linkBusy}>
+                {linkBusy ? t("garment.linkLoading") : t("garment.linkGo")}
+              </Button>
+            </div>
+          </form>
+          {linkFound && (
+            <div className="w-full space-y-2 text-left">
+              <p className="text-sm text-ink">
+                {linkFound.title && <span className="font-semibold">{linkFound.title} · </span>}
+                {t("garment.linkPick")}
+              </p>
+              <div className="grid grid-cols-4 gap-2">
+                {linkFound.images.map((src) => (
+                  <button
+                    key={src}
+                    type="button"
+                    disabled={linkBusy}
+                    onClick={() => pickLinkImage(src, linkFound)}
+                    className="overflow-hidden rounded-xl border border-line bg-cream"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt="" className="aspect-[3/4] w-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {onBack && (
             <Button variant="ghost" onClick={onBack}>
               {t("nav.back")}
@@ -137,7 +228,7 @@ export function GarmentStep({
         </Card>
       )}
 
-      {error && <ErrorNote onRetry={lastFile ? () => run(lastFile) : undefined}>{error}</ErrorNote>}
+      {error && <ErrorNote onRetry={lastFile ? () => run(lastFile, analysis?.source) : undefined}>{error}</ErrorNote>}
 
       {analysis && attrs && (
         <>
@@ -169,7 +260,7 @@ export function GarmentStep({
               {analysis.multicolor && <p className="mt-3 text-xs text-muted">{t("garment.multicolor")}</p>}
             </div>
             <div className="flex justify-end">
-              <FilePicker label={t("garment.replace")} onFile={run} variant="secondary" />
+              <FilePicker label={t("garment.replace")} onFile={(f) => run(f)} variant="secondary" />
             </div>
           </Card>
 

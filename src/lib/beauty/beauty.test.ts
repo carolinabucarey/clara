@@ -3,7 +3,7 @@ import { buildColorProfile } from "../color/profile";
 import { PARAM_SCHEMAS } from "../youcam/features";
 import { readFaceShape } from "../youcam/browser";
 import { makeupEffects, makeupFor } from "./makeup";
-import { suggestHairstyles, tagTemplate, templatesFor, type HairTemplate } from "./hairstyles";
+import { judgeHairstyle, suggestHairstyles, tagTemplate, templatesFor, type HairTemplate } from "./hairstyles";
 
 const warm = buildColorProfile({ skin: "#d9a98a", hair: "#3b2a20", eye: "#4a3426" });
 
@@ -68,6 +68,60 @@ describe("hairstyle suggestions", () => {
     expect(picks).toHaveLength(3);
     expect(picks[0].code).toBe("oblong_fringe");
     expect(picks.map((p) => p.templateId)).not.toContain("4");
+  });
+
+  it("reads YouCam's real catalog titles and suggests only haircuts", () => {
+    const real: HairTemplate[] = [
+      { id: "female_messy_bun", title: "Messy Bun", thumb: null, category: "Female" },
+      { id: "female_bald", title: "Bald", thumb: null, category: "Female" },
+      { id: "all_bow_accents", title: "Bow Accents", thumb: null, category: "Female" },
+      { id: "all_wavy_bob_bangs", title: "Wavy Bob With Bangs", thumb: null, category: "Female" },
+      { id: "all_face_framing", title: "Face Framing Shag Cut", thumb: null, category: "Female" },
+      { id: "female_crewcut", title: "Crewcut", thumb: null, category: "Female" },
+      { id: "male_textured_crop", title: "Textured Crop", thumb: null, category: "Male" },
+    ];
+    expect(tagTemplate(real[0]).cut).toBe(false);
+    expect(tagTemplate(real[3])).toMatchObject({ group: "feminine", fringe: true, waves: true, cut: true });
+    expect(tagTemplate(real[4]).layers).toBe(true);
+    expect(tagTemplate(real[5]).length).toBe("short");
+    expect(tagTemplate(real[6])).toMatchObject({ group: "masculine", length: "short", volumeTop: true });
+    const picks = suggestHairstyles(real, "oblong", "feminine").map((p) => p.templateId);
+    expect(picks).not.toContain("female_messy_bun");
+    expect(picks).not.toContain("female_bald");
+    expect(picks).not.toContain("all_bow_accents");
+    expect(picks[0]).toBe("all_wavy_bob_bangs");
+  });
+
+  it("never suggests a template that recolors the hair", () => {
+    const real: HairTemplate[] = [
+      { id: "all_steel_blonde_bob", title: "Steel Blonde Bob", thumb: null, category: "Female", changesColor: true },
+      { id: "all_bobcut", title: "Bobcut", thumb: null, category: "Female", changesColor: false },
+      { id: "female_long_straight", title: "Long Straight", thumb: null, category: "Female", changesColor: false },
+    ];
+    const picks = suggestHairstyles(real, "heart", "feminine").map((p) => p.templateId);
+    expect(picks).toEqual(["all_bobcut", "female_long_straight"]);
+    expect(templatesFor(real, "feminine")).toHaveLength(3);
+  });
+
+  it("says whether any chosen cut flatters the face, with its reasons", () => {
+    const cut = (title: string) => ({ title, category: "Female" });
+    expect(judgeHairstyle(cut("Wavy Bob With Bangs"), "oblong")).toMatchObject({
+      verdict: "flatters",
+      evidence: [
+        { code: "oblong_fringe", polarity: "plus" },
+        { code: "oblong_width", polarity: "plus" },
+      ],
+    });
+    expect(judgeHairstyle(cut("Long Straight"), "oblong")).toMatchObject({
+      verdict: "not_flattering",
+      evidence: [{ code: "oblong_long_straight", polarity: "minus" }],
+    });
+    // Ahead on balance but with a catch: it works, with tweaks.
+    expect(judgeHairstyle(cut("Long Straight Fringe"), "oblong").verdict).toBe("works_with_tweaks");
+    expect(judgeHairstyle(cut("Pixie"), "round")).toMatchObject({
+      verdict: "works_with_tweaks",
+      evidence: [{ code: "shape_no_effect", polarity: "neutral", params: { shape: "round" } }],
+    });
   });
 
   it("still suggests something without a face shape", () => {

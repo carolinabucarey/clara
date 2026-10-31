@@ -233,6 +233,12 @@ export function VerdictStep({
             <figcaption className="mt-1.5 text-center text-xs text-muted">{t("verdict.withPiece")}</figcaption>
           </figure>
         </div>
+        {/* YouCam takes no length: off a model it guesses the hem from the photo alone. */}
+        {trial.tryOnUrl && g.attrs.shownOn !== "model" && (
+          <p className="text-xs leading-relaxed text-muted">
+            {t("verdict.lengthNote", { length: t(`attr.length.${g.attrs.length}`) })}
+          </p>
+        )}
         <div className="flex items-center gap-3 rounded-2xl bg-cream px-3 py-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={g.isolatedUrl ?? g.originalUrl} alt="" className="h-12 w-12 rounded-xl object-contain" />

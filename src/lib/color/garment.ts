@@ -35,10 +35,12 @@ export function colorName(L: number, C: number, h: number): string {
     return "grey";
   }
   const warmish = h >= 40 && h < 105;
-  if (warmish && C < 32) {
+  // A muted red hue reads as a brown, not a red: #7b615b (L 44, C 12, h 38) is a greyish brown.
+  const mutedRed = h >= 20 && h < 40 && C < 20;
+  if ((warmish && C < 32) || mutedRed) {
     if (L > 85) return "cream";
     if (L > 68 && C < 24) return "beige";
-    if (L > 42) return C < 16 ? "taupe" : "camel";
+    if (L > 50) return C < 16 ? "taupe" : "camel";
     return "brown";
   }
   if (h >= 335 || h < 20) {

@@ -1,7 +1,7 @@
 "use client";
 
-// Who is signed in, and the sign-in methods: an email (a link, or a 6-digit code when
-// the template includes one) or Google in a popup. Both keep this page as it is.
+// Who is signed in, and how to sign in: an email with a link (or a 6-digit code when
+// the template includes one). Either way this page stays as it is.
 
 import { useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
@@ -67,17 +67,6 @@ export async function sendEmailCode(email: string) {
 export async function verifyEmailCode(email: string, token: string) {
   const { error } = await client().auth.verifyOtp({ email, token: token.trim(), type: "email" });
   if (error) throw authError(error, "invalidCode");
-}
-
-/** Google sign-in in a popup; /auth/callback completes it and the session reaches this tab. */
-export async function signInWithGoogle() {
-  const { data, error } = await client().auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo: `${window.location.origin}/auth/callback`, skipBrowserRedirect: true },
-  });
-  if (error || !data.url) throw new AccountError("generic");
-  const popup = window.open(data.url, "clara-sign-in", "width=480,height=640");
-  if (!popup) window.location.assign(data.url); // popup blocked: a full redirect still works
 }
 
 export async function signOut() {

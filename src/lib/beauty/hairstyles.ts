@@ -2,13 +2,15 @@
 // title and a category, so each template is tagged from its words (length, fringe,
 // volume, waves…), then scored with face-shape rules that read as goals.
 
-import type { FaceShape, HairStyleGroup, HairSuggestion } from "../types";
+import type { Evidence, FaceShape, HairStyleGroup, HairSuggestion, Verdict } from "../types";
 
 export interface HairTemplate {
   id: string;
   title: string;
   thumb: string | null;
   category: string | null;
+  /** Recolors the hair whatever we ask (YouCam's keep_users_color is false). */
+  changesColor?: boolean;
 }
 
 export interface HairTags {
@@ -18,6 +20,10 @@ export interface HairTags {
   fringe: boolean;
   waves: boolean;
   layers: boolean;
+  /** A haircut Clara can recommend; updos, braids, accessories and bald stay browse-only. */
+  cut: boolean;
+  /** A statement cut (buzz, combover, afro…): suggested only when a face-shape rule really asks for it. */
+  bold: boolean;
 }
 
 const has = (text: string, re: RegExp) => re.test(text);
@@ -39,16 +45,18 @@ export function tagTemplate(t: Pick<HairTemplate, "title" | "category">): HairTa
           : "any";
   const length: HairTags["length"] = has(text, /\b(long|waist|mermaid|rapunzel)\b/)
     ? "long"
-    : has(text, /\b(pixie|buzz|crew|fade|undercut|crop(ped)?|short|caesar|pompadour|quiff|taper(ed)?|ivy|mohawk|faux ?hawk)\b/)
+    : has(text, /\b(pixie|bixie|buzz|crew ?cut|crew|fade|undercut|crop(ped)?|short|caesar|pompadour|quiff|taper(ed)?|ivy|mohawk|faux ?hawk|comma|comb ?over|bald)\b/)
       ? "short"
       : "medium";
   return {
     group,
     length,
-    volumeTop: has(text, /\b(pompadour|quiff|volume|voluminous|mohawk|faux ?hawk|high|top knot|updo|bouffant)\b/),
+    volumeTop: has(text, /\b(pompadour|quiff|volume|voluminous|mohawk|faux ?hawk|high|top knot|updo|bouffant|textured|bubble)\b/),
     fringe: has(text, /\b(bangs?|fringe|curtain)\b/),
-    waves: has(text, /\b(waves?|wavy|curls?|curly|perm|ringlets?|coils?)\b/),
-    layers: has(text, /\b(layer(ed|s)?|shag|wolf|feather(ed)?|choppy)\b/),
+    waves: has(text, /\b(s-?waves?|waves?|wavy|curls?|curly|perm|ringlets?|coils?|crimp(ed|s)?|beachy|afro)\b/),
+    layers: has(text, /\b(layer(ed|s)?|shag|wolf|feather(ed)?|choppy|face framing|hush|wisps?)\b/),
+    cut: !has(text, /\b(bald|buns?|braids?|updo|pony ?tail|twintails|bows?|accents|headband|dreadlocks)\b/),
+    bold: has(text, /\b(buzz|crew ?cut|crewcut|comb ?over|combover|afro|mohawk|faux ?hawk)\b/),
   };
 }
 
@@ -104,6 +112,31 @@ const RULES: Record<FaceShape, Rule[]> = {
   ],
 };
 
+/** The face-shape rules a cut meets, and their total. */
+function faceFit(tags: HairTags, faceShape: FaceShape | null) {
+  const met = faceShape ? RULES[faceShape].filter((r) => r.when(tags)) : [];
+  return { met, score: met.reduce((sum, r) => sum + r.points, 0) };
+}
+
+/**
+ * Whether a cut suits this face shape, by the same rules that pick the suggestions:
+ * each rule it meets is a + or − line, and a cut that meets none is a matter of taste.
+ */
+export function judgeHairstyle(
+  t: Pick<HairTemplate, "title" | "category">,
+  faceShape: FaceShape,
+): { verdict: Verdict; evidence: Evidence[] } {
+  const { met, score } = faceFit(tagTemplate(t), faceShape);
+  const params = { shape: faceShape };
+  const evidence = [...met]
+    .sort((a, b) => b.points - a.points)
+    .map((r): Evidence => ({ code: r.code, polarity: r.points > 0 ? "plus" : "minus", params }));
+  if (evidence.length === 0) evidence.push({ code: "shape_no_effect", polarity: "neutral", params });
+  const verdict: Verdict =
+    score < 0 ? "not_flattering" : score > 0 && met.every((r) => r.points > 0) ? "flatters" : "works_with_tweaks";
+  return { verdict, evidence };
+}
+
 export function matchesGroup(tags: HairTags, group: HairStyleGroup): boolean {
   return group === "all" || tags.group === "any" || tags.group === group;
 }
@@ -113,25 +146,24 @@ export function templatesFor(templates: HairTemplate[], group: HairStyleGroup): 
   return templates.filter((t) => matchesGroup(tagTemplate(t), group));
 }
 
-/** The best `n` templates for this face shape, each with the rule that earned its place. */
+/**
+ * The best `n` templates for this face shape, each with the rule that earned its place.
+ * Clara suggests cuts, never a new hair color: templates that recolor are left out.
+ */
 export function suggestHairstyles(
   templates: HairTemplate[],
   faceShape: FaceShape | null,
   group: HairStyleGroup,
   n = 3,
 ): HairSuggestion[] {
-  const rules = faceShape ? RULES[faceShape] : [];
-  const scored = templatesFor(templates, group).map((t, i) => {
-    const tags = tagTemplate(t);
-    let score = 0;
-    let best: Rule | null = null;
-    for (const r of rules) {
-      if (!r.when(tags)) continue;
-      score += r.points;
-      if (r.points > 0 && (!best || r.points > best.points)) best = r;
-    }
-    return { t, tags, score, best, i };
-  });
+  const scored = templatesFor(templates, group)
+    .map((t, i) => ({ t, tags: tagTemplate(t), i }))
+    .filter(({ t, tags }) => tags.cut && !t.changesColor)
+    .map(({ t, tags, i }) => {
+      const fit = faceFit(tags, faceShape);
+      const best = fit.met.filter((r) => r.points > 0).sort((a, b) => b.points - a.points)[0] ?? null;
+      return { t, tags, score: fit.score + (tags.bold ? -0.75 : 0), best, i };
+    });
   scored.sort((a, b) => b.score - a.score || a.i - b.i);
 
   // Prefer variety: no two picks with the same length and fringe when there are alternatives.

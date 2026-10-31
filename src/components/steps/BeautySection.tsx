@@ -2,21 +2,23 @@
 
 import { useMemo, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
-import { applyHairstyle, applyMakeupLook, errorCode } from "@/lib/flow";
+import { applyHairstyle, applyLookOnBody, applyMakeupLook, errorCode } from "@/lib/flow";
 import { makeupEffects, makeupFor } from "@/lib/beauty/makeup";
-import { suggestHairstyles, templatesFor } from "@/lib/beauty/hairstyles";
+import { judgeHairstyle, suggestHairstyles, templatesFor } from "@/lib/beauty/hairstyles";
 import { useHairTemplates } from "@/lib/beauty/templates";
 import type { BeautyPrefs, HairStyleGroup } from "@/lib/types";
 import type { Look, Me } from "../ClaraApp";
-import { Button, Card, ChipSelect, cx, ErrorNote, Note, SkeletonImage, Spinner } from "../ui";
+import { Button, Card, ChipSelect, cx, ErrorNote, EvidenceList, Note, SkeletonImage, Spinner, VerdictPill } from "../ui";
 
 function HairTile({
   label,
+  note,
   thumb,
   selected,
   onClick,
 }: {
   label: string;
+  note?: string;
   thumb: string | null;
   selected: boolean;
   onClick: () => void;
@@ -33,6 +35,7 @@ function HairTile({
         {thumb && <img src={thumb} alt="" className="h-full w-full object-cover" />}
       </span>
       <span className="mt-1 block truncate text-xs text-ink">{label}</span>
+      {note && <span className="block truncate text-[11px] text-muted">{note}</span>}
     </button>
   );
 }
@@ -44,12 +47,15 @@ export function BeautySection({
   beauty,
   onBeauty,
   outfitHexes,
+  outfitUrl,
   onUpdateLook,
 }: {
   me: Me;
   look: Look;
   beauty: BeautyPrefs;
   onBeauty: (b: BeautyPrefs) => void;
+  /** The outfit try-on, to put the whole look on the full-body photo. */
+  outfitUrl?: string;
   /** Colors of the pieces nearest the face first, for the makeup to play along with. */
   outfitHexes: string[];
   onUpdateLook: (patch: Partial<Look>) => void;
@@ -58,6 +64,7 @@ export function BeautySection({
   const { templates, failed } = useHairTemplates();
   const [showAll, setShowAll] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [fullBusy, setFullBusy] = useState(false);
   const faceShape = me.faceShape?.shape ?? null;
 
   const suggestions = useMemo(
@@ -67,6 +74,8 @@ export function BeautySection({
   const catalog = useMemo(() => (templates ? templatesFor(templates, beauty.hair) : []), [templates, beauty.hair]);
   const chosen = look.hairTemplateId === undefined ? (suggestions[0]?.templateId ?? null) : look.hairTemplateId;
   const chosenSuggestion = suggestions.find((s) => s.templateId === chosen);
+  const chosenTemplate = templates?.find((x) => x.id === chosen);
+  const hairFit = chosenTemplate && faceShape ? judgeHairstyle(chosenTemplate, faceShape) : null;
   const titleOf = (id: string) => templates?.find((x) => x.id === id)?.title ?? "";
 
   const steps = useMemo(
@@ -76,12 +85,23 @@ export function BeautySection({
   const kept = steps.filter((s) => !look.makeupOff?.includes(s.category));
   const effects = makeupEffects(kept);
 
-  const hairKey = chosen ? `${me.selfieWideUrl}|${chosen}` : null;
-  const faceKey = `${me.selfieWideUrl}|${chosen ?? ""}|${JSON.stringify(effects)}`;
+  // Your own hair color, unless the cut you picked brings its own on purpose.
+  const ownColor = !chosenTemplate?.changesColor;
+  const hairSpec = chosen ? `${chosen}|${ownColor ? "own-color" : "template-color"}` : "";
+  const hairKey = chosen ? `${me.selfieWideUrl}|${hairSpec}` : null;
+  const faceKey = `${me.selfieWideUrl}|${hairSpec}|${JSON.stringify(effects)}`;
   const faceUrl = look.faceKey === faceKey ? look.faceUrl : undefined;
   const faceError = look.faceKey === faceKey ? look.faceError : undefined;
   const stale = !!look.faceUrl && look.faceKey !== faceKey;
   const canTry = !!chosen || effects.length > 0;
+  // The full-body photo only gets the makeup: the haircut stays on the portrait.
+  const fullKey = outfitUrl && effects.length > 0 ? `${outfitUrl}|${JSON.stringify(effects)}` : null;
+  const fullUrl = fullKey && look.fullKey === fullKey ? look.fullUrl : undefined;
+  const fullError = fullKey && look.fullKey === fullKey ? look.fullError : undefined;
+  const used = () => ({
+    faceMakeup: kept,
+    faceHair: chosen ? { templateId: chosen, title: titleOf(chosen), code: chosenSuggestion?.code, params: chosenSuggestion?.params } : null,
+  });
 
   const run = async () => {
     setBusy(true);
@@ -89,20 +109,29 @@ export function BeautySection({
     try {
       let hairUrl = hairKey && look.hairKey === hairKey ? look.hairUrl : undefined;
       if (chosen && !hairUrl) {
-        hairUrl = await applyHairstyle(me.selfieWideBlob, chosen);
+        hairUrl = await applyHairstyle(me.selfieWideBlob, chosen, ownColor);
         onUpdateLook({ hairUrl, hairKey: hairKey! });
       }
       const url = effects.length > 0 ? await applyMakeupLook(effects, chosen ? hairUrl! : null, me.selfieWideBlob) : hairUrl!;
-      onUpdateLook({
-        faceUrl: url,
-        faceKey,
-        faceMakeup: kept,
-        faceHair: chosen ? { templateId: chosen, title: titleOf(chosen), code: chosenSuggestion?.code, params: chosenSuggestion?.params } : null,
-      });
+      onUpdateLook({ faceUrl: url, faceKey, ...used() });
     } catch (e) {
       onUpdateLook({ faceError: errorCode(e), faceKey });
     } finally {
       setBusy(false);
+    }
+  };
+
+  const runFull = async () => {
+    if (!outfitUrl || !fullKey) return;
+    setFullBusy(true);
+    onUpdateLook({ fullUrl: undefined, fullError: undefined, fullKey });
+    try {
+      const url = await applyLookOnBody(outfitUrl, effects);
+      onUpdateLook({ fullUrl: url, fullKey, faceMakeup: kept });
+    } catch (e) {
+      onUpdateLook({ fullError: errorCode(e), fullKey });
+    } finally {
+      setFullBusy(false);
     }
   };
 
@@ -158,8 +187,19 @@ export function BeautySection({
                 />
               ))}
             </div>
-            {chosenSuggestion && (
-              <p className="text-sm leading-relaxed text-ink/80">{tl(`beauty.hairWhy.${chosenSuggestion.code}`, chosenSuggestion.params)}</p>
+            {chosenTemplate && (
+              <div className="space-y-2 rounded-2xl bg-cream px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-ink">{chosenTemplate.title}</span>
+                  {hairFit && <VerdictPill verdict={hairFit.verdict} size="sm" />}
+                </div>
+                {hairFit ? (
+                  <EvidenceList items={hairFit.evidence} render={(e) => tl(`beauty.hairWhy.${e.code}`, e.params)} />
+                ) : (
+                  <p className="text-sm text-muted">{t("beauty.fitNoShape")}</p>
+                )}
+                {chosenTemplate.changesColor && <p className="text-xs text-muted">{t("beauty.colorNote")}</p>}
+              </div>
             )}
             {catalog.length > suggestions.length && (
               <button className="text-sm font-semibold text-clay underline-offset-4 hover:underline" onClick={() => setShowAll((v) => !v)}>
@@ -174,6 +214,7 @@ export function BeautySection({
                     <HairTile
                       key={c.id}
                       label={c.title}
+                      note={c.changesColor ? t("beauty.changesColor") : undefined}
                       thumb={c.thumb}
                       selected={chosen === c.id}
                       onClick={() => onUpdateLook({ hairTemplateId: c.id })}
@@ -263,6 +304,34 @@ export function BeautySection({
           </div>
         )}
       </div>
+
+      {/* The makeup on the full-body outfit photo */}
+      {fullKey && (
+        <div className="space-y-3 border-t border-line pt-4">
+          <div>
+            <h3 className="text-sm font-semibold text-ink">{t("beauty.fullTitle")}</h3>
+            <p className="text-xs text-muted">{t("beauty.fullNote")}</p>
+          </div>
+          {(fullBusy || fullUrl) && (
+            <figure className="mx-auto w-full max-w-sm">
+              {fullUrl && !fullBusy ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={fullUrl} alt="" className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
+              ) : (
+                <SkeletonImage label={t("beauty.fullTrying")} />
+              )}
+            </figure>
+          )}
+          {fullError && !fullBusy && <ErrorNote onRetry={runFull}>{t(`errors.${fullError}`)}</ErrorNote>}
+          {!fullUrl && !fullBusy && (
+            <div className="flex justify-end">
+              <Button variant={faceUrl ? "primary" : "secondary"} onClick={runFull}>
+                {t("beauty.fullTry")}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
     </Card>
   );
 }
