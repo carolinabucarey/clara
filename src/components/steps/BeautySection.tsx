@@ -94,7 +94,8 @@ export function BeautySection({
   const faceError = look.faceKey === faceKey ? look.faceError : undefined;
   const stale = !!look.faceUrl && look.faceKey !== faceKey;
   const canTry = !!chosen || effects.length > 0;
-  const fullKey = outfitUrl ? `${outfitUrl}|${chosen ?? ""}|${JSON.stringify(effects)}` : null;
+  // The full-body photo only gets the makeup: the haircut stays on the portrait.
+  const fullKey = outfitUrl && effects.length > 0 ? `${outfitUrl}|${JSON.stringify(effects)}` : null;
   const fullUrl = fullKey && look.fullKey === fullKey ? look.fullUrl : undefined;
   const fullError = fullKey && look.fullKey === fullKey ? look.fullError : undefined;
   const used = () => ({
@@ -125,8 +126,8 @@ export function BeautySection({
     setFullBusy(true);
     onUpdateLook({ fullUrl: undefined, fullError: undefined, fullKey });
     try {
-      const url = await applyLookOnBody(outfitUrl, chosen, effects);
-      onUpdateLook({ fullUrl: url, fullKey, ...used() });
+      const url = await applyLookOnBody(outfitUrl, effects);
+      onUpdateLook({ fullUrl: url, fullKey, faceMakeup: kept });
     } catch (e) {
       onUpdateLook({ fullError: errorCode(e), fullKey });
     } finally {
@@ -304,8 +305,8 @@ export function BeautySection({
         )}
       </div>
 
-      {/* The whole look on the full-body outfit photo */}
-      {outfitUrl && canTry && (
+      {/* The makeup on the full-body outfit photo */}
+      {fullKey && (
         <div className="space-y-3 border-t border-line pt-4">
           <div>
             <h3 className="text-sm font-semibold text-ink">{t("beauty.fullTitle")}</h3>

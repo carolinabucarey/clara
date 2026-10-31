@@ -227,10 +227,10 @@ export const en = {
     after: "With the look",
     pickSomething: "Pick a haircut or makeup to try it on.",
     stale: "You changed the selection: try it on again to see it.",
-    fullTitle: "The whole look, on your full-body photo",
-    fullNote: "Clara crops your head and shoulders, styles them and puts them back into the outfit photo, so the face can look a little softer than in the portrait.",
+    fullTitle: "The makeup, on your full-body photo",
+    fullNote: "Clara crops your head and shoulders, applies the makeup and puts them back into the outfit photo, so the face can look a little softer than in the portrait. The haircut shows in the portrait.",
     fullTry: "Put it on my full-body photo",
-    fullTrying: "Putting hair and makeup on your full-body photo…",
+    fullTrying: "Putting the makeup on your full-body photo…",
     why: {
       blush: "A {shade} blush, in your {undertone} undertone (skin hue {skinHue}°).",
       blush_shape: "A {shade} blush in your {undertone} undertone, placed for your {shape} face.",

@@ -88,7 +88,7 @@ export interface Look {
   faceUrl?: string;
   faceKey?: string;
   faceError?: string;
-  /** Hair and makeup on the full-body outfit photo (lib/flow applyLookOnBody). */
+  /** Makeup on the full-body outfit photo (lib/flow applyLookOnBody). */
   fullUrl?: string;
   fullKey?: string;
   fullError?: string;
@@ -294,7 +294,7 @@ export function ClaraApp() {
         faceUrl: loaded.faceUrl,
         faceKey: loaded.faceUrl ? `${me.selfieWideUrl}|${templateId ?? ""}|${effects}` : undefined,
         fullUrl: loaded.fullUrl,
-        fullKey: loaded.fullUrl && outfitShown ? `${outfitShown}|${templateId ?? ""}|${effects}` : undefined,
+        fullKey: loaded.fullUrl && outfitShown ? `${outfitShown}|${effects}` : undefined,
         faceMakeup: saved.makeup ?? undefined,
         faceHair: saved.hairstyle,
       },

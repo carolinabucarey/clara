@@ -45,8 +45,9 @@ answers "how does this look on me?" with an honest, explained verdict.
 8. **Hair and makeup.** YouCam **AI Face Analyzer** reads the face shape once; Clara suggests three haircuts
    from YouCam's **AI Hairstyle** catalog with the reason for each, and, if the person wants it, a makeup look
    (blush, eyes, liner, lips) from their undertone, depth and contrast that lets the outfit's color lead. Both
-   are tried on a head-and-shoulders crop of the selfie, before/after, and can be put on the full-body outfit
-   photo (the head is cropped, enlarged, styled and pasted back, since the face there is too small for YouCam).
+   are tried on a head-and-shoulders crop of the selfie, before/after. The makeup (not the haircut, which never
+   blended in) can also be put on the full-body outfit photo: the head is cropped, enlarged, made up and pasted
+   back, since the face there is too small for YouCam.
    The person chooses which haircut styles to see and whether to see makeup: Clara never guesses gender.
 9. **Compare and save.** "Which one?" ranks the pieces tried in the session; the verdict can be downloaded or
    shared as an image card. With an account, looks (and, with consent, the profile) are saved, and a saved look
@@ -169,7 +170,7 @@ one-tap examples on the first screen.
   presents it as style advice.
 - The try-on image can alter details of the face or body; the verdict relies on measurements, not on the generated image.
 - An outfit is built by chaining one-category try-ons, so each extra piece is another generation step.
-- On the full-body photo, hair and makeup go through a crop that is enlarged and pasted back, so the face looks
+- On the full-body photo, the makeup goes through a crop that is enlarged and pasted back, so the face looks
   softer than in the selfie portrait.
 - Store links work when the page publishes its product photos (JSON-LD or `og:image`); pages that only render
   them with JavaScript or block automated requests need a screenshot instead.

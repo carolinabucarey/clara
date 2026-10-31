@@ -350,7 +350,7 @@ async function headBox(canvas: HTMLCanvasElement): Promise<Rect | null> {
   return { x: (Math.max(...xs) + Math.min(...xs)) / 2 - width / 2, y: nose.y * canvas.height - height * 0.55, width, height };
 }
 
-/** Taller than the selfie crop, so long hair fits before the edges fade back to the photo. */
+/** Head and shoulders with room around them, so the edges fade back to the photo well away from the face. */
 function lookCrop(face: Rect, imgW: number, imgH: number): Rect {
   const width = Math.min(imgW, face.width * 3.6);
   const height = Math.min(imgH, width * 1.6);
@@ -397,11 +397,12 @@ function pasteFeathered(target: HTMLCanvasElement, patch: HTMLImageElement, r: R
 }
 
 /**
- * The whole look in one picture: the face in a full-body photo is too small for
- * YouCam's hairstyle and makeup try-ons, so the head and shoulders are cropped,
- * enlarged, styled, and pasted back into the outfit photo.
+ * The makeup on the outfit photo: the face in a full-body photo is too small for
+ * YouCam's makeup try-on, so the head and shoulders are cropped, enlarged, made up,
+ * and pasted back. The haircut stays on the selfie portrait: pasted into a full-body
+ * photo it never blended in.
  */
-export async function applyLookOnBody(outfitUrl: string, templateId: string | null, effects: MakeupEffect[]) {
+export async function applyLookOnBody(outfitUrl: string, effects: MakeupEffect[]) {
   const img = await loadImage(outfitUrl).catch(() => {
     throw new FlowError("baseExpired");
   });
@@ -410,9 +411,7 @@ export async function applyLookOnBody(outfitUrl: string, templateId: string | nu
   if (!head) throw new FlowError("no_face_local");
   const rect = lookCrop(head, full.width, full.height);
   const crop = await canvasToBlob(cropScaled(full, rect, 1024));
-  let url: string | null = templateId ? await applyHairstyle(crop, templateId) : null;
-  if (effects.length > 0) url = await applyMakeupLook(effects, url, crop);
-  if (!url) throw new FlowError("generic");
+  const url = await applyMakeupLook(effects, null, crop);
   pasteFeathered(full, await loadImage(url), rect);
   return URL.createObjectURL(await canvasToBlob(full));
 }

@@ -229,10 +229,10 @@ export const es: Dictionary = {
     after: "Con el look",
     pickSomething: "Elige un corte o maquillaje para probártelo.",
     stale: "Cambiaste la selección: pruébatelo de nuevo para verla.",
-    fullTitle: "Todo el look en tu foto de cuerpo entero",
-    fullNote: "Clara recorta tu cabeza y hombros, les aplica el look y los devuelve a la foto con el conjunto, así que la cara puede verse un poco menos nítida que en el retrato.",
+    fullTitle: "El maquillaje en tu foto de cuerpo entero",
+    fullNote: "Clara recorta tu cabeza y hombros, les aplica el maquillaje y los devuelve a la foto con el conjunto, así que la cara puede verse un poco menos nítida que en el retrato. El corte lo ves en el retrato.",
     fullTry: "Ponerlo en mi foto de cuerpo entero",
-    fullTrying: "Poniendo peinado y maquillaje en tu foto de cuerpo entero…",
+    fullTrying: "Poniendo el maquillaje en tu foto de cuerpo entero…",
     why: {
       blush: "Un rubor {shade}, en tu subtono {undertone} (matiz de piel {skinHue}°).",
       blush_shape: "Un rubor {shade} en tu subtono {undertone}, ubicado para tu rostro {shape}.",
