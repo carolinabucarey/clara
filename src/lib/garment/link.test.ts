@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { extractProductImages, isPrivateAddress } from "./link";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { extractProductImages, isPrivateAddress, safeFetch } from "./link";
+
+vi.mock("node:dns/promises", () => ({ lookup: async () => [{ address: "23.45.67.89", family: 4 }] }));
 
 const page = (head: string) => `<html><head>${head}</head><body></body></html>`;
 
@@ -33,5 +35,22 @@ describe("private address guard", () => {
   });
   it("allows public addresses", () => {
     for (const ip of ["104.18.10.1", "8.8.8.8", "2606:4700::6810:84e5"]) expect(isPrivateAddress(ip)).toBe(false);
+  });
+});
+
+describe("store fetch", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const answer = (status: number) => vi.stubGlobal("fetch", async () => new Response("<h1>Access Denied</h1>", { status }));
+  const get = () => safeFetch("https://www.zara.com/cl/es/p.html", { accept: "text/html", maxBytes: 1000 });
+
+  it("says the store blocked us when it refuses the request, so the person isn't told to retry", async () => {
+    for (const status of [401, 403, 429]) {
+      answer(status);
+      await expect(get()).rejects.toMatchObject({ code: "linkBlocked" });
+    }
+  });
+  it("keeps other failures as unreachable", async () => {
+    answer(503);
+    await expect(get()).rejects.toMatchObject({ code: "linkUnreachable" });
   });
 });

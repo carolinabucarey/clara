@@ -611,6 +611,7 @@ export const es: Dictionary = {
     baseExpired: "La prueba anterior expiró. Inténtalo de nuevo.",
     linkInvalid: "Ese link no funciona. Pega la dirección completa de la página del producto (https://…).",
     linkUnreachable: "No pude abrir esa página. Inténtalo de nuevo o sube una captura de la prenda.",
+    linkBlocked: "Esta tienda no me deja abrir sus páginas. Sube una captura de la prenda.",
     linkNoImage: "No encontré la foto del producto en esa página. Sube una captura de la prenda.",
   },
 };
