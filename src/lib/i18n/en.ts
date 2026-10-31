@@ -35,6 +35,7 @@ export const en = {
     upload: "Upload the garment",
     paste: "Paste the photo",
     replace: "Use another photo",
+    keepCurrent: "Keep the current one",
     linkLabel: "Or paste the store link",
     linkGo: "Bring it",
     linkLoading: "Looking…",

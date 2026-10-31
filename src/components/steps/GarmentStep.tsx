@@ -53,6 +53,9 @@ export function GarmentStep({
   const [link, setLink] = useState("");
   const [linkBusy, setLinkBusy] = useState(false);
   const [linkFound, setLinkFound] = useState<{ url: string; title: string | null; images: string[] } | null>(null);
+  // "Use another photo" reopens every way in (upload, paste, link, demos), keeping the
+  // current analysis until a new one replaces it.
+  const [picking, setPicking] = useState(false);
 
   useEffect(() => {
     fetch("/demo/garments.json")
@@ -64,6 +67,7 @@ export function GarmentStep({
   const run = async (file: Blob, source?: GarmentAnalysis["source"]) => {
     setLastFile(file);
     setError(null);
+    setPicking(false);
     setAnalysis(null);
     setStage("reading");
     try {
@@ -83,7 +87,7 @@ export function GarmentStep({
   // A photo copied on the store page works like an upload: a store that blocks our link
   // fetch can't block the person's own browser. Cmd/Ctrl+V anywhere on this step…
   const onPaste = useEffectEvent((e: ClipboardEvent) => {
-    if (analysis || stage !== "idle") return;
+    if ((analysis && !picking) || stage !== "idle") return;
     const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
     if (!file) return;
     e.preventDefault();
@@ -160,7 +164,16 @@ export function GarmentStep({
     }
   };
 
+  const pickAnother = () => {
+    setPicking(true);
+    setError(null);
+    setLink("");
+    setLinkFound(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const busy = stage !== "idle";
+  const showPicker = (!analysis || picking) && !busy;
   const set = <K extends keyof GarmentAttributes>(k: K, v: GarmentAttributes[K]) =>
     setAttrs((a) => (a ? { ...a, [k]: v, uncertain: a.uncertain.filter((u) => u !== k) } : a));
   const opts = <T extends string>(group: string, values: readonly T[]) =>
@@ -183,7 +196,7 @@ export function GarmentStep({
         subtitle={complement ? t("garment.complementSubtitle") : t("garment.subtitle")}
       />
 
-      {!analysis && !busy && (
+      {showPicker && (
         <Card className="flex flex-col items-center gap-4 border-dashed py-10 text-center">
           <div className="text-5xl" aria-hidden>
             👗
@@ -243,10 +256,16 @@ export function GarmentStep({
               </div>
             </div>
           )}
-          {onBack && (
-            <Button variant="ghost" onClick={onBack}>
-              {t("nav.back")}
+          {analysis ? (
+            <Button variant="ghost" onClick={() => setPicking(false)}>
+              {t("garment.keepCurrent")}
             </Button>
+          ) : (
+            onBack && (
+              <Button variant="ghost" onClick={onBack}>
+                {t("nav.back")}
+              </Button>
+            )
           )}
           {demos.length > 0 && (
             <div className="w-full pt-2">
@@ -273,7 +292,7 @@ export function GarmentStep({
 
       {error && <ErrorNote onRetry={lastFile ? () => run(lastFile, analysis?.source) : undefined}>{error}</ErrorNote>}
 
-      {analysis && attrs && (
+      {analysis && attrs && !picking && (
         <>
           <Card className="space-y-4">
             <div className={analysis.isolatedUrl ? "grid grid-cols-2 gap-3" : "mx-auto max-w-[260px]"}>
@@ -303,7 +322,9 @@ export function GarmentStep({
               {analysis.multicolor && <p className="mt-3 text-xs text-muted">{t("garment.multicolor")}</p>}
             </div>
             <div className="flex justify-end">
-              <FilePicker label={t("garment.replace")} onFile={(f) => run(f)} variant="secondary" />
+              <Button variant="secondary" onClick={pickAnother}>
+                {t("garment.replace")}
+              </Button>
             </div>
           </Card>
 

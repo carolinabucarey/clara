@@ -37,6 +37,7 @@ export const es: Dictionary = {
     upload: "Subir la prenda",
     paste: "Pegar la foto",
     replace: "Usar otra foto",
+    keepCurrent: "Mantener la actual",
     linkLabel: "O pega el link de la tienda",
     linkGo: "Traer",
     linkLoading: "Buscando…",
