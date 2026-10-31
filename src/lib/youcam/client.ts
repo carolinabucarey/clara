@@ -27,17 +27,14 @@ function apiKey(): string {
 }
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = {
+    Authorization: `Bearer ${apiKey()}`,
+    "Content-Type": "application/json",
+    ...(init.headers ?? {}),
+  };
   let res: Response;
   try {
-    res = await fetch(`${YOUCAM_BASE}${path}`, {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${apiKey()}`,
-        "Content-Type": "application/json",
-        ...(init.headers ?? {}),
-      },
-      cache: "no-store",
-    });
+    res = await fetch(`${YOUCAM_BASE}${path}`, { ...init, headers, cache: "no-store" });
   } catch (err) {
     throw new YouCamError("network_error", `Could not reach YouCam: ${(err as Error).message}`, 502);
   }

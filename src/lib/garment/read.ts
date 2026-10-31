@@ -19,7 +19,9 @@ import {
   type GarmentAttributes,
 } from "../types";
 
-const ATTR_NAMES = ["category", "neckline", "sleeves", "length", "fit", "waist", "rise", "leg", "pattern"] as const;
+import { ATTR_NAMES } from "./defaults";
+
+export { DEFAULT_ATTRIBUTES } from "./defaults";
 
 export const GarmentReadSchema = z.object({
   is_garment: z.boolean(),
@@ -85,18 +87,3 @@ export function toAttributes(read: z.infer<typeof GarmentReadSchema>): GarmentAt
     uncertain: read.uncertain_fields,
   };
 }
-
-export const DEFAULT_ATTRIBUTES: GarmentAttributes = {
-  category: "upper_body",
-  neckline: "crew",
-  sleeves: "long",
-  length: "hip",
-  fit: "straight",
-  waist: "undefined",
-  rise: "na",
-  leg: "na",
-  pattern: "solid",
-  shownOn: "flat_lay",
-  confidence: "low",
-  uncertain: [...ATTR_NAMES],
-};

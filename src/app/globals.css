@@ -1,26 +1,75 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --cream: #faf6f1;
+  --paper: #ffffff;
+  --sand: #efe6dc;
+  --line: #e4d8cb;
+  --ink: #241c17;
+  --muted: #6f625a;
+  --clay: #a8492f;
+  --clay-soft: #f4e2da;
+  --sage: #4f7a5a;
+  --sage-soft: #e3eee4;
+  --amber: #a86d12;
+  --amber-soft: #f6ead2;
+  --rose: #a63d52;
+  --rose-soft: #f5e0e4;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-cream: var(--cream);
+  --color-paper: var(--paper);
+  --color-sand: var(--sand);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-clay: var(--clay);
+  --color-clay-soft: var(--clay-soft);
+  --color-sage: var(--sage);
+  --color-sage-soft: var(--sage-soft);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-rose: var(--rose);
+  --color-rose-soft: var(--rose-soft);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-fraunces);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--cream);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+.checker {
+  background-color: #f7f2ec;
+  background-image:
+    linear-gradient(45deg, #efe7de 25%, transparent 25%), linear-gradient(-45deg, #efe7de 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #efe7de 75%), linear-gradient(-45deg, transparent 75%, #efe7de 75%);
+  background-size: 16px 16px;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, var(--sand) 25%, #f8f1ea 50%, var(--sand) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
 }
