@@ -119,6 +119,9 @@ const STEPS: Array<Exclude<Step, "compare" | "looks">> = ["garment", "photos", "
 /** Identifies what a save captured, so "Saved" turns back into "Save look" after a change. */
 const lookSignature = (l: Look) => JSON.stringify([l.pieces, l.outfitKey, l.faceKey, l.fullKey]);
 
+/** Identifies the photos in use; either can change on its own. */
+const photosOf = (m: Me) => `${m.selfieUrl}|${m.bodyUrl}`;
+
 export function ClaraApp() {
   const { t, locale, setLocale } = useI18n();
   const [step, setStep] = useState<Step>("garment");
@@ -138,7 +141,7 @@ export function ClaraApp() {
   const [pendingSave, setPendingSave] = useState(false);
   const [consent, setConsent] = useState(false);
   /** Whether the account holds a profile, and for which photos (to re-upload only when they change). */
-  const [profileSync, setProfileSync] = useState<{ saved: boolean; selfieUrl: string | null }>({ saved: false, selfieUrl: null });
+  const [profileSync, setProfileSync] = useState<{ saved: boolean; photos: string | null }>({ saved: false, photos: null });
   const [meFromAccount, setMeFromAccount] = useState(false);
   const [save, setSave] = useState<{ signature: string; status: "saving" | "saved" | "error" | "expired" } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -211,8 +214,8 @@ export function ClaraApp() {
       updateLook({ saved }, index);
       // With consent the first time; afterwards the account profile simply stays current.
       if (withProfile || profileSync.saved) {
-        await saveProfile(me, { beauty, goals }, profileSync.selfieUrl !== me.selfieUrl);
-        setProfileSync({ saved: true, selfieUrl: me.selfieUrl });
+        await saveProfile(me, { beauty, goals }, profileSync.photos !== photosOf(me));
+        setProfileSync({ saved: true, photos: photosOf(me) });
       }
       setSave({ signature, status: "saved" });
     } catch (e) {
@@ -234,7 +237,7 @@ export function ClaraApp() {
     if (uid === lastUser.current) return;
     lastUser.current = uid;
     if (!uid) {
-      setProfileSync({ saved: false, selfieUrl: null });
+      setProfileSync({ saved: false, photos: null });
       return;
     }
     setAuthOpen(false);
@@ -254,7 +257,7 @@ export function ClaraApp() {
         setMe((current) => current ?? saved.me);
         setBeauty(saved.beauty);
         setGoals(saved.goals);
-        setProfileSync({ saved: true, selfieUrl: saved.me.selfieUrl });
+        setProfileSync({ saved: true, photos: photosOf(saved.me) });
         setMeFromAccount(true);
       })
       .catch(() => undefined);
@@ -305,7 +308,7 @@ export function ClaraApp() {
     if (!window.confirm(t("account.confirmDeleteData"))) return;
     try {
       await deleteAllData();
-      setProfileSync({ saved: false, selfieUrl: null });
+      setProfileSync({ saved: false, photos: null });
       setSave(null);
       setNotice(t("account.deleted"));
       if (step === "looks") setStep("garment");
@@ -318,7 +321,7 @@ export function ClaraApp() {
     if (!window.confirm(t("account.confirmDeleteAccount"))) return;
     try {
       await deleteAccount();
-      setProfileSync({ saved: false, selfieUrl: null });
+      setProfileSync({ saved: false, photos: null });
       setSave(null);
       setNotice(t("account.deleted"));
       if (step === "looks") setStep("garment");
@@ -526,11 +529,11 @@ export function ClaraApp() {
           <PhotosStep
             me={me}
             fromAccount={meFromAccount}
-            onDone={(m) => {
+            onDone={(m, changed) => {
               setMe(m);
               setMeFromAccount(false);
-              // New photos: everything that was computed on the old ones is stale.
-              setTrials((ts) => ts.map((tr) => ({ ...tr, ...STALE_VERDICT, ...STALE_TRY_ON })));
+              // A new photo changes the measurements, so the verdicts; a new body photo, the try-ons too.
+              setTrials((ts) => ts.map((tr) => ({ ...tr, ...STALE_VERDICT, ...(changed.body ? STALE_TRY_ON : {}) })));
               setStep("profile");
             }}
             onKeep={() => setStep("profile")}
