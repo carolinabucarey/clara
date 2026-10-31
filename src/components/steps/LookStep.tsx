@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { checkTryOnFidelity, errorCode, tryOnOutfit } from "@/lib/flow";
-import { fullLookUrl, missingSlots, outfitKey, outfitPlan, wearOrder } from "@/lib/look";
+import { missingSlots, outfitKey, outfitPlan, wearOrder } from "@/lib/look";
 import { renderLookCard } from "@/lib/share";
 import { evaluateOutfit, suggestComplement, type OutfitPieces } from "@/lib/verdict/outfit";
 import type { BeautyPrefs, Goal, Slot } from "@/lib/types";
@@ -114,12 +114,13 @@ export function LookStep({
     [look.pieces, trials],
   );
   const palette = trials[current]?.result?.palette ?? [];
-  const fullUrl = fullLookUrl(look, outfitUrl);
+  // The portrait and full look as BeautySection shows them: a change of pieces can make them stale.
+  const [shown, setShown] = useState<{ faceUrl?: string; fullUrl?: string }>({});
 
   const shareCard = () =>
     renderLookCard({
-      imageUrl: fullUrl ?? outfitUrl!,
-      portraitUrl: look.faceUrl,
+      imageUrl: shown.fullUrl ?? outfitUrl!,
+      portraitUrl: shown.faceUrl,
       pieces: order.map((s) => {
         const g = pieceOf(s).garment;
         return { imageUrl: g.isolatedUrl ?? g.originalUrl, hex: g.color.hex, label: `${t(`attr.category.${g.attrs.category}`)} · ${t(`colors.${g.color.name}`)}` };
@@ -259,6 +260,7 @@ export function LookStep({
         outfitHexes={outfitHexes}
         outfitUrl={outfitUrl}
         onUpdateLook={onUpdateLook}
+        onShown={setShown}
       />
 
       <Card className="space-y-4">

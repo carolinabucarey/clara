@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { applyHairstyle, applyLookOnBody, applyMakeupLook, errorCode } from "@/lib/flow";
 import { makeupEffects, makeupFor } from "@/lib/beauty/makeup";
@@ -50,6 +50,7 @@ export function BeautySection({
   outfitHexes,
   outfitUrl,
   onUpdateLook,
+  onShown,
 }: {
   me: Me;
   look: Look;
@@ -60,6 +61,8 @@ export function BeautySection({
   /** Colors of the pieces nearest the face first, for the makeup to play along with. */
   outfitHexes: string[];
   onUpdateLook: (patch: Partial<Look>) => void;
+  /** Told which portrait and full look are current (the ones shown), for the share card. */
+  onShown?: (shown: { faceUrl?: string; fullUrl?: string }) => void;
 }) {
   const { t, tl } = useI18n();
   const { templates, failed } = useHairTemplates();
@@ -99,6 +102,9 @@ export function BeautySection({
   const fullKey = outfitUrl && effects.length > 0 ? `${outfitUrl}|${JSON.stringify(effects)}` : null;
   const fullUrl = fullKey && look.fullKey === fullKey ? look.fullUrl : undefined;
   const fullError = fullKey && look.fullKey === fullKey ? look.fullError : undefined;
+  useEffect(() => {
+    onShown?.({ faceUrl, fullUrl });
+  }, [onShown, faceUrl, fullUrl]);
   const used = () => ({
     faceMakeup: kept,
     faceHair: chosen ? { templateId: chosen, title: titleOf(chosen), code: chosenSuggestion?.code, params: chosenSuggestion?.params } : null,
