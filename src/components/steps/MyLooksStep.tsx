@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
-import { deleteLook, listLooks, lookImagePaths, type SavedLook } from "@/lib/account/looks";
+import { deleteLook, listLooks, lookImagePaths, renameLook, type SavedLook } from "@/lib/account/looks";
 import { signedUrls } from "@/lib/account/storage";
 import { Button, Card, ErrorNote, EvidenceList, Note, OutfitPill, Spinner, StepHeader, VerdictPill } from "../ui";
 
@@ -142,6 +142,17 @@ export function MyLooksStep({
     }
   };
 
+  const rename = async (look: SavedLook) => {
+    const name = window.prompt(t("looks.renamePrompt"), look.name ?? "");
+    if (name === null) return;
+    try {
+      const renamed = await renameLook(look, name);
+      setLooks((ls) => ls?.map((l) => (l.id === look.id ? renamed : l)) ?? null);
+    } catch {
+      setFailed(true);
+    }
+  };
+
   const remove = async (look: SavedLook) => {
     if (!window.confirm(t("looks.confirmDelete"))) return;
     try {
@@ -172,6 +183,7 @@ export function MyLooksStep({
                 )}
               </span>
               <span className="min-w-0 flex-1 space-y-1.5">
+                {look.name && <span className="block truncate font-display text-lg leading-tight text-ink">{look.name}</span>}
                 <span className="block text-sm text-ink">
                   {look.pieces.map((p) => t(`attr.category.${p.attrs.category}`)).join(" + ")}
                 </span>
@@ -189,6 +201,9 @@ export function MyLooksStep({
                 <LookDetail look={look} urls={urls} />
                 {!canEdit && <Note>{t("looks.needPhotos")}</Note>}
                 <div className="flex flex-wrap justify-end gap-3">
+                  <Button variant="ghost" onClick={() => rename(look)}>
+                    {look.name ? t("looks.rename") : t("looks.addName")}
+                  </Button>
                   <Button variant="ghost" onClick={() => remove(look)}>
                     {t("looks.delete")}
                   </Button>
