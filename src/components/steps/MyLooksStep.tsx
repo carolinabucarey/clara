@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { deleteLook, listLooks, lookImagePaths, type SavedLook } from "@/lib/account/looks";
 import { signedUrls } from "@/lib/account/storage";
-import { Button, Card, ErrorNote, EvidenceList, Note, OutfitPill, Spinner, StepHeader, VerdictPill } from "../ui";
+import { renderLookCard } from "@/lib/share";
+import { Button, Card, ErrorNote, EvidenceList, Note, OutfitPill, ShareButton, Spinner, StepHeader, VerdictPill } from "../ui";
 
 function LookDetail({ look, urls }: { look: SavedLook; urls: Record<string, string> }) {
   const { t, tl, ev, locale } = useI18n();
@@ -142,6 +143,20 @@ export function MyLooksStep({
     }
   };
 
+  const shareCard = (look: SavedLook, cover: string) =>
+    renderLookCard({
+      imageUrl: urls[cover],
+      portraitUrl: look.facePath ? urls[look.facePath] : undefined,
+      pieces: look.pieces.map((p) => ({
+        imageUrl: urls[p.garmentPath],
+        hex: p.color.hex,
+        label: `${t(`attr.category.${p.attrs.category}`)} · ${t(`colors.${p.color.name}`)}`,
+      })),
+      outfit: look.outfit ? { verdict: look.outfit.verdict, label: t(`look.levels.${look.outfit.verdict}`) } : undefined,
+      palette: look.pieces.find((p) => p.result)?.result?.palette ?? [],
+      labels: { title: t("look.title"), footer: t("privacy") },
+    });
+
   const remove = async (look: SavedLook) => {
     if (!window.confirm(t("looks.confirmDelete"))) return;
     try {
@@ -192,6 +207,7 @@ export function MyLooksStep({
                   <Button variant="ghost" onClick={() => remove(look)}>
                     {t("looks.delete")}
                   </Button>
+                  {cover && urls[cover] && <ShareButton render={() => shareCard(look, cover)} filename="clara-look.png" />}
                   <Button variant="secondary" disabled={!canEdit || opening !== null} onClick={() => edit(look)}>
                     {opening === look.id ? t("looks.opening") : t("looks.edit")}
                   </Button>

@@ -1,9 +1,10 @@
 "use client";
 
 import { useI18n } from "@/lib/i18n/context";
-import { slotFor, type Slot } from "@/lib/types";
+import { COMPARE_CARD_MAX, renderCompareCard } from "@/lib/share";
+import { slotFor, type Slot, type Verdict } from "@/lib/types";
 import type { Trial } from "../ClaraApp";
-import { Card, StepHeader, VerdictPill } from "../ui";
+import { Card, ShareButton, StepHeader, VerdictPill } from "../ui";
 
 const SCORE = { flatters: 2, works_with_tweaks: 1, not_flattering: 0 } as const;
 
@@ -19,6 +20,28 @@ export function CompareStep({ trials, slot, onOpen }: { trials: Trial[]; slot: S
     score: SCORE[tr.result!.cut.verdict] + SCORE[tr.result!.color.verdict] + (tr.result!.cut.score + tr.result!.color.score) / 100,
   }));
   const best = scored.reduce<number | null>((b, s) => (b === null || s.score > scored.find((x) => x.i === b)!.score ? s.i : b), null);
+
+  // The card fits a few: the best scored, in the order they are shown here.
+  const shareCard = () => {
+    const shown = new Set([...scored].sort((a, b) => b.score - a.score).slice(0, COMPARE_CARD_MAX).map((s) => s.i));
+    const levels = {
+      flatters: t("verdict.levels.flatters"),
+      works_with_tweaks: t("verdict.levels.works_with_tweaks"),
+      not_flattering: t("verdict.levels.not_flattering"),
+    } as Record<Verdict, string>;
+    return renderCompareCard({
+      items: scored
+        .filter((s) => shown.has(s.i))
+        .map(({ tr, i }) => ({
+          imageUrl: tr.tryOnUrl ?? tr.garment.originalUrl,
+          cut: tr.result!.cut.verdict,
+          color: tr.result!.color.verdict,
+          best: best === i,
+        })),
+      palette: scored.find((s) => s.i === best)?.tr.result!.palette ?? [],
+      labels: { title: t("compare.title"), cut: t("verdict.cut"), color: t("verdict.color"), levels, best: t("compare.best"), footer: t("privacy") },
+    });
+  };
 
   return (
     <div className="space-y-5">
@@ -40,6 +63,9 @@ export function CompareStep({ trials, slot, onOpen }: { trials: Trial[]; slot: S
             </Card>
           </button>
         ))}
+      </div>
+      <div className="flex flex-wrap justify-end gap-3">
+        <ShareButton render={shareCard} filename="clara-compare.png" />
       </div>
     </div>
   );

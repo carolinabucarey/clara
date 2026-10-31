@@ -1,8 +1,9 @@
 "use client";
 
-import { useId, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { useId, useRef, useState, useSyncExternalStore, type ButtonHTMLAttributes, type ReactNode } from "react";
 import type { Confidence, Evidence, OutfitVerdict, Verdict } from "@/lib/types";
 import { useI18n } from "@/lib/i18n/context";
+import { canShareFiles, shareImage } from "@/lib/share";
 
 export function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -87,6 +88,50 @@ export function ErrorNote({ children, onRetry }: { children: ReactNode; onRetry?
 
 export function Note({ children }: { children: ReactNode }) {
   return <p className="rounded-2xl bg-sand/70 px-4 py-3 text-sm leading-relaxed text-muted">{children}</p>;
+}
+
+const noSubscribe = () => () => {};
+
+/**
+ * Draws a share card on tap and opens the share sheet, or downloads the image where
+ * the browser has none. Sits in a wrapping row of buttons: the error takes a full line.
+ */
+export function ShareButton({
+  render,
+  filename,
+  variant = "secondary",
+}: {
+  render: () => Promise<Blob>;
+  filename: string;
+  variant?: "primary" | "secondary" | "ghost";
+}) {
+  const { t } = useI18n();
+  const canShare = useSyncExternalStore(noSubscribe, canShareFiles, () => false);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const share = async () => {
+    setBusy(true);
+    setFailed(false);
+    try {
+      await shareImage(await render(), filename);
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <Button variant={variant} onClick={share} disabled={busy}>
+        {busy ? t("share.preparing") : canShare ? t("share.share") : t("share.download")}
+      </Button>
+      {failed && (
+        <div className="basis-full">
+          <ErrorNote onRetry={share}>{t("errors.generic")}</ErrorNote>
+        </div>
+      )}
+    </>
+  );
 }
 
 const VERDICT_STYLE: Record<Verdict, string> = {
