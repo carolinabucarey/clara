@@ -302,6 +302,7 @@ export const es: Dictionary = {
       invalidEmail: "Revisa el correo.",
       invalidCode: "Ese código no funcionó. Revísalo o pide uno nuevo.",
       rateLimited: "Demasiados intentos. Espera un minuto e inténtalo de nuevo.",
+      emailQuota: "Envié demasiados correos de acceso en la última hora. Inténtalo de nuevo más tarde.",
       generic: "Algo salió mal. Inténtalo de nuevo.",
     },
   },

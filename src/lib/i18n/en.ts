@@ -300,6 +300,7 @@ export const en = {
       invalidEmail: "Check the email address.",
       invalidCode: "That code didn't work. Check it or ask for a new one.",
       rateLimited: "Too many attempts. Wait a minute and try again.",
+      emailQuota: "I've sent too many sign-in emails in the last hour. Try again later.",
       generic: "Something went wrong. Please try again.",
     },
   },
