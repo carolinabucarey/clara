@@ -5,7 +5,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { preloadVision } from "@/lib/pose/vision";
 import type { GarmentAnalysis } from "@/lib/flow";
 import type { ColorProfile, Goal, Proportions, VerdictDraft, VerdictResult } from "@/lib/types";
-import { cx } from "./ui";
+import { ClaraAvatar, cx } from "./ui";
 import { GarmentStep } from "./steps/GarmentStep";
 import { PhotosStep } from "./steps/PhotosStep";
 import { ProfileStep } from "./steps/ProfileStep";
@@ -79,9 +79,12 @@ export function ClaraApp() {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-4 pb-10 sm:px-6">
       <header className="flex items-center justify-between gap-4 py-5">
-        <button onClick={startOver} className="text-left" aria-label={t("nav.startOver")}>
-          <span className="font-display text-3xl font-semibold tracking-tight text-ink">Clara</span>
-          <span className="block text-xs text-muted">{t("meta.tagline")}</span>
+        <button onClick={startOver} className="flex items-center gap-3 text-left" aria-label={t("nav.startOver")}>
+          <ClaraAvatar size={48} />
+          <span>
+            <span className="font-display text-3xl font-semibold tracking-tight text-ink">Clara</span>
+            <span className="block text-xs text-muted">{t("meta.tagline")}</span>
+          </span>
         </button>
         <button
           onClick={() => setLocale(locale === "en" ? "es" : "en")}

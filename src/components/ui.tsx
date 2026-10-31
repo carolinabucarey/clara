@@ -28,6 +28,26 @@ export function Button({
   );
 }
 
+// Pre-rendered sizes in public/avatars/clara-circular-{size}.webp.
+const AVATAR_SIZES = [24, 32, 40, 48, 64, 96, 128, 192, 256, 512, 1024];
+
+/** Clara's circular avatar, served from the closest pre-rendered size (1x and 2x). */
+export function ClaraAvatar({ size = 40, className }: { size?: number; className?: string }) {
+  const pick = (px: number) => AVATAR_SIZES.find((s) => s >= px) ?? AVATAR_SIZES[AVATAR_SIZES.length - 1];
+  const src = (px: number) => `/avatars/clara-circular-${pick(px)}.webp`;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src(size)}
+      srcSet={`${src(size)} 1x, ${src(size * 2)} 2x`}
+      width={size}
+      height={size}
+      alt="Clara"
+      className={cx("shrink-0 rounded-full", className)}
+    />
+  );
+}
+
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
   return <section className={cx("rounded-3xl border border-line bg-paper p-5 shadow-sm", className)}>{children}</section>;
 }
