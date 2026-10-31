@@ -6,6 +6,7 @@ import { applyLipstick, errorCode, tryOnBetterColor } from "@/lib/flow";
 import type { RescueKind } from "@/lib/types";
 import type { Me, Trial } from "../ClaraApp";
 import { Button, Card, ErrorNote, Note, SkeletonImage, Swatch } from "../ui";
+import { ZoomableImage } from "../ZoomableImage";
 
 const ICONS: Record<RescueKind, string> = {
   lipstick: "💄",
@@ -169,18 +170,12 @@ export function RescueSection({
           {(betterBusy || trial.betterUrl) && (
             <div className="grid grid-cols-2 gap-3">
               <figure>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={trial.tryOnUrl ?? trial.garment.originalUrl}
-                  alt=""
-                  className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover"
-                />
+                <ZoomableImage src={trial.tryOnUrl ?? trial.garment.originalUrl} className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
                 <figcaption className="mt-1.5 text-center text-xs text-muted">{t("rescue.yours")}</figcaption>
               </figure>
               <figure>
                 {trial.betterUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={trial.betterUrl} alt="" className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
+                  <ZoomableImage src={trial.betterUrl} className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
                 ) : (
                   <SkeletonImage label={t("rescue.betterApplying")} />
                 )}

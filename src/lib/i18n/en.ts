@@ -26,6 +26,11 @@ export const en = {
     ft: "ft",
     in: "in",
   },
+  zoom: {
+    open: "Enlarge the photo",
+    close: "Close",
+    hint: "Pinch or double-tap to zoom in",
+  },
   garment: {
     title: "Show me the piece you're unsure about",
     complementTitle: { top: "Now, the top", bottom: "Now, the bottom", outer: "Now, the layer", full: "Now, the dress" },

@@ -28,6 +28,11 @@ export const es: Dictionary = {
     ft: "pies",
     in: "pulg.",
   },
+  zoom: {
+    open: "Ampliar la foto",
+    close: "Cerrar",
+    hint: "Pellizca o toca dos veces para acercar",
+  },
   garment: {
     title: "Muéstrame la prenda que te hace dudar",
     complementTitle: { top: "Ahora, la parte de arriba", bottom: "Ahora, la parte de abajo", outer: "Ahora, el abrigo", full: "Ahora, el vestido" },
