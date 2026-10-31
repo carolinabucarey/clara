@@ -1,12 +1,14 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { evidenceText, rescueText, translate, type Locale, type Params } from "./index";
+import { evidenceText, localizedText, rescueText, translate, type Locale, type Params } from "./index";
 
 interface I18n {
   locale: Locale;
   setLocale: (l: Locale) => void;
   t: (path: string, params?: Params) => string;
+  /** Like `t`, translating params that are codes (colors, shades, face shapes…). */
+  tl: (path: string, params?: Params) => string;
   ev: (code: string, params?: Params) => string;
   rs: (code: string, params?: Params) => string;
 }
@@ -45,6 +47,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       locale,
       setLocale,
       t: (path, params) => translate(locale, path, params),
+      tl: (path, params) => localizedText(locale, path, params),
       ev: (code, params) => evidenceText(locale, code, params),
       rs: (code, params) => rescueText(locale, code, params),
     }),

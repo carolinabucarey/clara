@@ -44,7 +44,18 @@ function PhotoSlot({
   );
 }
 
-export function PhotosStep({ me, onDone, onKeep }: { me: Me | null; onDone: (m: Me) => void; onKeep: () => void }) {
+export function PhotosStep({
+  me,
+  fromAccount,
+  onDone,
+  onKeep,
+}: {
+  me: Me | null;
+  /** The photos came from the person's account rather than this session. */
+  fromAccount?: boolean;
+  onDone: (m: Me) => void;
+  onKeep: () => void;
+}) {
   const { t, locale } = useI18n();
   const [selfie, setSelfie] = useState<File | null>(null);
   const [body, setBody] = useState<File | null>(null);
@@ -65,7 +76,7 @@ export function PhotosStep({ me, onDone, onKeep }: { me: Me | null; onDone: (m: 
     return (
       <div className="space-y-5">
         <StepHeader title={t("photos.title")} />
-        <Note>{t("photos.savedProfile")}</Note>
+        <Note>{fromAccount ? t("photos.savedAccount") : t("photos.savedProfile")}</Note>
         <div className="flex flex-wrap justify-end gap-3">
           <Button variant="secondary" onClick={() => setReplacing(true)}>
             {t("photos.newPhotos")}

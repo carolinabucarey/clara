@@ -13,8 +13,10 @@ import {
   PATTERNS,
   RISES,
   SLEEVES,
+  SLOT_CATEGORY,
   WAISTS,
   type GarmentAttributes,
+  type Slot,
 } from "@/lib/types";
 import { Button, Card, ChipSelect, ErrorNote, FilePicker, Note, SkeletonImage, Spinner, StepHeader, Swatch } from "../ui";
 
@@ -26,7 +28,18 @@ interface DemoGarment {
 const TOP_LENGTHS = ["cropped", "waist", "hip", "tunic"] as const;
 const LONG_LENGTHS = ["mini", "knee", "midi", "maxi", "ankle", "full_length"] as const;
 
-export function GarmentStep({ initial, onDone }: { initial?: GarmentAnalysis; onDone: (g: GarmentAnalysis) => void }) {
+export function GarmentStep({
+  initial,
+  complement,
+  onDone,
+  onBack,
+}: {
+  initial?: GarmentAnalysis;
+  /** Adding this slot to an existing look: the category is already known. */
+  complement?: Slot;
+  onDone: (g: GarmentAnalysis) => void;
+  onBack?: () => void;
+}) {
   const { t } = useI18n();
   const [analysis, setAnalysis] = useState<GarmentAnalysis | null>(initial ?? null);
   const [attrs, setAttrs] = useState<GarmentAttributes | null>(initial?.attrs ?? null);
@@ -49,7 +62,9 @@ export function GarmentStep({ initial, onDone }: { initial?: GarmentAnalysis; on
     setAnalysis(null);
     setStage("reading");
     try {
-      const a = await analyzeGarment(file, (s) => setStage(s));
+      const read = await analyzeGarment(file, (s) => setStage(s));
+      // The person said what this piece is: trust that over the automatic reading.
+      const a = complement ? { ...read, attrs: { ...read.attrs, category: SLOT_CATEGORY[complement] } } : read;
       setAnalysis(a);
       setAttrs(a.attrs);
       setColorHex(a.color.hex);
@@ -83,7 +98,10 @@ export function GarmentStep({ initial, onDone }: { initial?: GarmentAnalysis; on
 
   return (
     <div className="space-y-5">
-      <StepHeader title={t("garment.title")} subtitle={t("garment.subtitle")} />
+      <StepHeader
+        title={complement ? t(`garment.complementTitle.${complement}`) : t("garment.title")}
+        subtitle={complement ? t("garment.complementSubtitle") : t("garment.subtitle")}
+      />
 
       {!analysis && !busy && (
         <Card className="flex flex-col items-center gap-4 border-dashed py-10 text-center">
@@ -91,6 +109,11 @@ export function GarmentStep({ initial, onDone }: { initial?: GarmentAnalysis; on
             👗
           </div>
           <FilePicker label={t("garment.upload")} onFile={run} />
+          {onBack && (
+            <Button variant="ghost" onClick={onBack}>
+              {t("nav.back")}
+            </Button>
+          )}
           {demos.length > 0 && (
             <div className="w-full pt-2">
               <p className="mb-3 text-sm text-muted">{t("garment.demo")}</p>

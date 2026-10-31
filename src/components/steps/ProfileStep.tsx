@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
-import type { Goal, RatioRange } from "@/lib/types";
+import { FACE_SHAPES, type BeautyPrefs, type Goal, type RatioRange } from "@/lib/types";
 import type { Me } from "../ClaraApp";
 import { Button, Card, ChipSelect, ConfidenceBadge, cx, StepHeader, Swatch } from "../ui";
 
@@ -27,6 +27,8 @@ export function ProfileStep({
   me,
   goals,
   onGoals,
+  beauty,
+  onBeauty,
   onChange,
   onRetake,
   onDone,
@@ -34,6 +36,8 @@ export function ProfileStep({
   me: Me;
   goals: Goal[];
   onGoals: (g: Goal[]) => void;
+  beauty: BeautyPrefs;
+  onBeauty: (b: BeautyPrefs) => void;
   onChange: (patch: Partial<Me>) => void;
   onRetake: () => void;
   onDone: () => void;
@@ -41,6 +45,8 @@ export function ProfileStep({
   const { t } = useI18n();
   const [editColor, setEditColor] = useState(false);
   const [editBody, setEditBody] = useState(false);
+  const [editFace, setEditFace] = useState(false);
+  const face = me.faceShape;
   const { profile: p, proportions: b } = me;
   const ratio = (r: RatioRange | null) =>
     r ? t("profile.ratio", { value: r.value.toFixed(2), low: r.low.toFixed(2), high: r.high.toFixed(2) }) : t("profile.noRatio");
@@ -187,6 +193,53 @@ export function ProfileStep({
             />
           </div>
         )}
+      </Card>
+
+      <Card className="space-y-4">
+        <div>
+          <h2 className="font-display text-xl text-ink">{t("beauty.title")}</h2>
+          <p className="text-sm text-muted">{t("beauty.subtitle")}</p>
+        </div>
+        {face ? (
+          <Row
+            label={t("beauty.faceShape")}
+            value={t(`faceShapes.${face.shape}`)}
+            evidence={face.aspect ? t("beauty.faceShapeEvidence", { value: face.aspect.toFixed(2) }) : ""}
+            corrected={face.shape !== face.measured}
+          />
+        ) : (
+          <p className="text-sm text-muted">{t("beauty.faceShapeUnknown")}</p>
+        )}
+        {face && (
+          <button className="text-sm font-semibold text-clay underline-offset-4 hover:underline" onClick={() => setEditFace((v) => !v)}>
+            {t("profile.correct")}
+          </button>
+        )}
+        {(editFace || !face) && (
+          <ChipSelect
+            label={t("beauty.faceShape")}
+            value={face?.shape ?? ("" as never)}
+            options={FACE_SHAPES.map((v) => ({ value: v, label: t(`faceShapes.${v}`) }))}
+            onChange={(shape) =>
+              onChange({ faceShape: { shape, measured: face?.measured ?? shape, aspect: face?.aspect ?? null, corrected: true } })
+            }
+          />
+        )}
+        <ChipSelect
+          label={t("beauty.makeupQuestion")}
+          value={beauty.makeup === null ? ("" as never) : beauty.makeup ? "yes" : "no"}
+          options={[
+            { value: "yes" as const, label: t("beauty.yes") },
+            { value: "no" as const, label: t("beauty.no") },
+          ]}
+          onChange={(v) => onBeauty({ ...beauty, makeup: v === "yes" })}
+        />
+        <ChipSelect
+          label={t("beauty.hairQuestion")}
+          value={beauty.hair}
+          options={(["feminine", "masculine", "all"] as const).map((v) => ({ value: v, label: t(`beauty.hairGroups.${v}`) }))}
+          onChange={(hair) => onBeauty({ ...beauty, hair })}
+        />
       </Card>
 
       <Card className="space-y-3">

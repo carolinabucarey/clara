@@ -22,7 +22,9 @@ Clara starts from the garment *you* chose: a screenshot from any online store or
 4. **It tries it on you.** YouCam's Clothes Virtual Try-On puts the piece on your own photo, side by side with the original.
 5. **The verdict, cut and color separately.** For each one, Clara gives one of three verdicts: *Flatters you*, *Works with tweaks* or *Not your best*. Each comes with the reasons, for example: "Your skin reads warm (hue 63°) and this camel is a warm color too, so it echoes your natural coloring."
 6. **Make it work.** If the color doesn't flatter you, YouCam's Makeup Virtual Try-On applies a lipstick in your undertone on your photo, with a before and after. Clara can also recolor the same piece into your palette and try it on again. Cut rescues (belt, tuck, layer, shoes) come from the same evidence.
-7. **Which one?** Clara compares the pieces you tried and picks the best for you. You can save or share the verdict as an image before you buy.
+7. **The full look.** Tried a top? Add the bottom (or a jacket) and Clara tries them on you together, then tells you how they work together: whether the colors read as one long line or cut you in two, whether the volume is balanced, where the top meets the rise. With only one piece, she tells you which colors and cuts to look for.
+8. **Hair and makeup.** YouCam reads your face shape, and Clara suggests three haircuts from YouCam's hairstyle catalog, each with its reason ("a fringe visually shortens your oblong face"). If you want makeup, she suggests blush, eyes, liner and lips in your undertone that let your outfit's color lead, and tries it all on your selfie, before and after. You choose which haircut styles to see and whether to see makeup; Clara never guesses your gender.
+9. **Which one, and keep it.** Clara compares the pieces you tried and picks the best for you. Sign in with an emailed code (or Google) to save your looks; with your OK, your profile is saved too, so next time you skip the photos.
 
 **For the shopper:** fewer regrets, and a reason behind every recommendation.
 
@@ -31,18 +33,22 @@ Clara starts from the garment *you* chose: a screenshot from any online store or
 ## How we built it
 
 - **Next.js** web app on **Vercel**. The server routes proxy YouCam so the API key never reaches the browser.
-- **YouCam AI APIs**, four of them chained, all on the V2 flow: file, signed upload, task, then polling the task status from the browser.
+- **YouCam AI APIs**, six of them chained, all on the V2 flow: file, signed upload, task, then polling the task status from the browser.
 
   | API | What Clara uses it for |
   | --- | --- |
   | AI Facial Color Tones Analyzer (`skin-tone-analysis`) | Skin, hair, eye and lip colors |
   | AI Clothes Virtual Try-On (`cloth-v4`, with `cloth` as fallback) | The chosen piece, and its recolored better version, on the user |
-  | AI Makeup Virtual Try-On (`makeup-vto`, `lip_color`) | Lipstick rescue on the user's own photo |
+  | AI Makeup Virtual Try-On (`makeup-vto`: lips, blush, eye shadow, liner) | Lipstick rescue and the suggested makeup look |
   | AI Photo Background Removal (`sod`) | Isolating the garment before measuring and recoloring it |
+  | AI Hairstyle Virtual Try-On (`hair-transfer` v2.1) | The suggested haircuts, keeping the user's hair color |
+  | AI Face Analyzer (`face-attr-analysis`) | Face shape behind the haircut and blush placement |
 
 - **Color science, in our own code.** CIELAB conversion. Undertone from the skin hue angle, depth from the Individual Typology Angle (ITA°), and contrast from the ΔL* between skin and hair or eyes. The garment's dominant colors come from k-means clustering, and the recolor transfers the Lab offset so folds and shadows survive.
 - **Proportions measured in the browser.** MediaPipe Pose Landmarker plus its segmentation mask: we measure shoulder, waist and hip widths on the silhouette, not on the joints, so the body photo never has to leave the device for this step.
-- **A deterministic verdict engine.** Color and cut rule tables produce the verdict and attach evidence codes, ranges and confidence.
+- **A deterministic verdict engine.** Color, cut and outfit rule tables produce the verdicts and attach evidence codes, ranges and confidence. Makeup and haircut suggestions follow the same pattern: every pick carries the measured reason behind it.
+- **Outfits by chaining try-ons.** YouCam changes one garment category per task, so Clara puts the pieces on in order (base first, layer last) and reuses any try-on that already shows them.
+- **Accounts on Supabase.** Email-code and Google sign-in that never leave the page, Postgres and Storage behind row-level security, and one-tap deletion of everything.
 - **Claude.** Claude Opus 5.5 only *writes* the verdict from that evidence. A validator rejects defect-oriented wording ("hide", "flaw", fruit-shaped body types), and template text takes over if anything fails. Claude vision pre-fills the garment's construction, because YouCam has no garment-analysis endpoint.
 - **English and Spanish** interface.
 
@@ -56,7 +62,7 @@ Clara starts from the garment *you* chose: a screenshot from any online store or
 ## Accomplishments that we're proud of
 
 - **Trust by design.** Six principles hold on every screen: show the work, try it instead of promising it, talk about goals instead of defects, admit what isn't known, rescue instead of forbidding, and care for the photo.
-- Four YouCam APIs chained in one flow that a new user understands without explanation.
+- Six YouCam APIs chained in one flow that a new user understands without explanation: from one piece to a complete look, hair and makeup included.
 - The model never decides the verdict, and never invents a trait. It only explains measured evidence.
 
 ## What we learned
@@ -67,10 +73,9 @@ Clara starts from the garment *you* chose: a screenshot from any online store or
 ## What's next for Clara
 
 - A store widget, "Ask Clara", next to the product photo, so the second opinion lives inside the purchase.
-- Several pieces at once, to judge complete outfits.
 - Occasion-aware advice (an interview, a wedding).
 - Size and fit signals from the store's measurement charts.
 
 ## Built with
 
-`next.js` · `react` · `typescript` · `tailwind-css` · `vercel` · `youcam-api` · `mediapipe` · `claude` · `anthropic-api` · `zod` · `vitest`
+`next.js` · `react` · `typescript` · `tailwind-css` · `vercel` · `youcam-api` · `mediapipe` · `claude` · `anthropic-api` · `supabase` · `zod` · `vitest`

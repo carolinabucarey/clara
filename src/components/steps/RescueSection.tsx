@@ -5,7 +5,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { applyLipstick, errorCode, tryOnBetterColor } from "@/lib/flow";
 import type { RescueKind } from "@/lib/types";
 import type { Me, Trial } from "../ClaraApp";
-import { Button, Card, ErrorNote, Note, SkeletonImage, StepHeader, Swatch } from "../ui";
+import { Button, Card, ErrorNote, Note, SkeletonImage, Swatch } from "../ui";
 
 const ICONS: Record<RescueKind, string> = {
   lipstick: "💄",
@@ -20,7 +20,19 @@ const ICONS: Record<RescueKind, string> = {
   untuck: "👕",
 };
 
-export function RescueStep({ me, trial, onUpdate, onBack }: { me: Me; trial: Trial; onUpdate: (p: Partial<Trial>) => void; onBack: () => void }) {
+/** How to make one piece work: lipstick, better color, cut tips. Part of the look step. */
+export function RescueSection({
+  me,
+  trial,
+  onUpdate,
+  autoRun,
+}: {
+  me: Me;
+  trial: Trial;
+  onUpdate: (p: Partial<Trial>) => void;
+  /** Apply the lipstick right away (only for the piece the person is looking at). */
+  autoRun: boolean;
+}) {
   const { t, rs } = useI18n();
   const result = trial.result!;
   const lip = result.rescues.find((r) => r.kind === "lipstick");
@@ -62,7 +74,7 @@ export function RescueStep({ me, trial, onUpdate, onBack }: { me: Me; trial: Tri
   };
 
   useEffect(() => {
-    if (!lip || trial.lipUrl || started.current) return;
+    if (!autoRun || !lip || trial.lipUrl || started.current) return;
     started.current = true;
     void runLip();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -71,9 +83,7 @@ export function RescueStep({ me, trial, onUpdate, onBack }: { me: Me; trial: Tri
   const lipName = lip?.lipstick ? t(`lipsticks.${lip.lipstick.name}`) : "";
 
   return (
-    <div className="space-y-5">
-      <StepHeader title={t("rescue.title")} subtitle={t("rescue.subtitle")} />
-
+    <div className="space-y-4">
       {result.rescues.length === 0 && <Note>{t("rescue.nothing")}</Note>}
 
       {lip?.lipstick && (
@@ -99,6 +109,13 @@ export function RescueStep({ me, trial, onUpdate, onBack }: { me: Me; trial: Tri
               <figcaption className="mt-1.5 text-center text-xs text-muted">{t("rescue.after")}</figcaption>
             </figure>
           </div>
+          {!trial.lipUrl && !busy && !error && (
+            <div className="flex justify-end">
+              <Button variant="secondary" onClick={runLip}>
+                {t("rescue.lipTry")}
+              </Button>
+            </div>
+          )}
           {error && <ErrorNote onRetry={runLip}>{error}</ErrorNote>}
         </Card>
       )}
@@ -174,21 +191,6 @@ export function RescueStep({ me, trial, onUpdate, onBack }: { me: Me; trial: Tri
           {betterError && <ErrorNote onRetry={runBetter}>{betterError}</ErrorNote>}
         </Card>
       )}
-
-      <Card className="space-y-3">
-        <h2 className="font-display text-lg text-ink">{t("rescue.paletteTitle")}</h2>
-        <div className="flex flex-wrap gap-4">
-          {result.palette.map((s) => (
-            <Swatch key={s} hex={s} size={40} />
-          ))}
-        </div>
-      </Card>
-
-      <div className="flex justify-end">
-        <Button variant="secondary" onClick={onBack}>
-          {t("nav.back")}
-        </Button>
-      </div>
     </div>
   );
 }

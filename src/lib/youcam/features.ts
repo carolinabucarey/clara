@@ -10,10 +10,14 @@ export const FEATURES = {
   cloth: "cloth-v4",
   /** Clothes virtual try-on, previous engine (fallback). */
   clothLegacy: "cloth",
-  /** Makeup virtual try-on (lipstick rescue). */
+  /** Makeup virtual try-on (lipstick rescue and the suggested makeup look). */
   makeup: "makeup-vto",
   /** Background removal, used to isolate the garment before measuring its color. */
   removeBackground: "sod",
+  /** Hairstyle try-on from a preset template (v2.1 task endpoints). */
+  hairTransfer: "hair-transfer",
+  /** Face attributes: Clara only asks for the face shape and its aspect ratio. */
+  faceAnalyzer: "face-attr-analysis",
 } as const;
 
 export type Feature = (typeof FEATURES)[keyof typeof FEATURES];
@@ -24,7 +28,15 @@ export function isFeature(value: string): value is Feature {
   return ALLOWED_FEATURES.has(value);
 }
 
+/** Version of each feature's task endpoints; file registration is always v2.0. */
+const TASK_VERSION: Partial<Record<Feature, string>> = { "hair-transfer": "v2.1" };
+
+export function taskVersion(feature: Feature): string {
+  return TASK_VERSION[feature] ?? "v2.0";
+}
+
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+const intensity = z.number().int().min(0).max(100);
 
 export const lipEffectSchema = z.object({
   category: z.literal("lip_color"),
@@ -35,14 +47,48 @@ export const lipEffectSchema = z.object({
       z.object({
         color: hex,
         texture: z.enum(["matte", "gloss", "satin", "sheer"]),
-        colorIntensity: z.number().int().min(0).max(100),
-        gloss: z.number().int().min(0).max(100).optional(),
-        transparencyIntensity: z.number().int().min(0).max(100).optional(),
+        colorIntensity: intensity,
+        gloss: intensity.optional(),
+        transparencyIntensity: intensity.optional(),
       }),
     )
     .min(1)
     .max(2),
 });
+
+// Pattern names must be labels from YouCam's catalogs (plugins-media.makeupar.com/wcm-saas/patterns/*.json).
+const pattern = z.object({ name: z.string().regex(/^[A-Za-z0-9&]{2,24}$/) });
+
+export const blushEffectSchema = z.object({
+  category: z.literal("blush"),
+  pattern,
+  palettes: z.array(z.object({ color: hex, texture: z.literal("matte"), colorIntensity: intensity })).min(1).max(3),
+});
+
+const eyePalette = z.object({ color: hex, texture: z.literal("matte"), colorIntensity: intensity });
+
+export const eyeShadowEffectSchema = z.object({
+  category: z.literal("eye_shadow"),
+  pattern,
+  palettes: z.array(eyePalette).min(1).max(5),
+});
+
+export const eyeLinerEffectSchema = z.object({
+  category: z.literal("eye_liner"),
+  pattern,
+  palettes: z.array(eyePalette).min(1).max(3),
+});
+
+export const makeupEffectSchema = z.discriminatedUnion("category", [
+  lipEffectSchema,
+  blushEffectSchema,
+  eyeShadowEffectSchema,
+  eyeLinerEffectSchema,
+]);
+
+export type MakeupEffect = z.infer<typeof makeupEffectSchema>;
+
+export const FACE_ATTRIBUTES = ["faceShape", "faceAspectRatio"] as const;
 
 export const PARAM_SCHEMAS: Record<Feature, z.ZodType<Record<string, unknown>>> = {
   "skin-tone-analysis": z.object({
@@ -58,10 +104,18 @@ export const PARAM_SCHEMAS: Record<Feature, z.ZodType<Record<string, unknown>>> 
     change_shoes: z.boolean().default(false),
   }),
   "makeup-vto": z.object({
-    effects: z.array(lipEffectSchema).min(1).max(1),
+    effects: z.array(makeupEffectSchema).min(1).max(6),
     version: z.literal("1.0").default("1.0"),
   }),
   sod: z.object({}),
+  "hair-transfer": z.object({
+    template_id: z.string().regex(/^[\w-]{1,100}$/),
+    hair_color: z.enum(["ref", "src"]).default("src"),
+  }),
+  "face-attr-analysis": z.object({
+    features: z.array(z.enum(FACE_ATTRIBUTES)).min(1).max(FACE_ATTRIBUTES.length),
+    face_angle_strictness_level: z.enum(["strict", "high", "medium", "low", "flexible"]).default("medium"),
+  }),
 };
 
 /** Which uploaded images each feature takes. */
@@ -71,6 +125,8 @@ export const FEATURE_INPUTS: Record<Feature, { ref: boolean }> = {
   cloth: { ref: true },
   "makeup-vto": { ref: false },
   sod: { ref: false },
+  "hair-transfer": { ref: false },
+  "face-attr-analysis": { ref: false },
 };
 
 export function lipstickEffect(hexColor: string) {
