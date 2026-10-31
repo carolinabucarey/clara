@@ -121,7 +121,7 @@ npm run dev
 | `YOUCAM_API_BASE` | no | Defaults to `https://yce-api-01.makeupar.com` |
 | `YOUCAM_CACHE` | no | `1` caches YouCam results on disk (always on in `next dev`) to save API units |
 | `NEXT_PUBLIC_SUPABASE_URL` | for accounts | Supabase project URL. Without the Supabase variables Clara has no accounts and stores nothing. |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | for accounts | Public (anon or publishable) key; RLS protects the data |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | for accounts | Public key (`sb_publishable_…`; a legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` also works); RLS protects the data |
 | `SUPABASE_SERVICE_ROLE_KEY` | for accounts | Server only, used by `DELETE /api/account` to delete the auth user |
 
 `npm install` copies the MediaPipe WASM runtime into `public/mediapipe/`; the pose and face models are in
