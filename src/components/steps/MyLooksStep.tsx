@@ -32,6 +32,17 @@ function LookDetail({ look, urls }: { look: SavedLook; urls: Record<string, stri
             <figcaption className="mt-1.5 text-center text-xs text-muted">{t("looks.portrait")}</figcaption>
           </figure>
         )}
+        {look.pieces.map((p, i) => p.better && urls[p.better.tryOnPath] && (
+          <figure key={i}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={urls[p.better.tryOnPath]} alt="" className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
+            <figcaption className="mt-1.5 flex items-center justify-center gap-1.5 text-xs text-muted">
+              <span className="inline-block h-3 w-3 shrink-0 rounded-full border border-black/10" style={{ background: p.better.hex }} aria-hidden />
+              {t("rescue.inYourColor")}
+              {look.pieces.length > 1 && <> · {t(`attr.category.${p.attrs.category}`)}</>}
+            </figcaption>
+          </figure>
+        ))}
       </div>
       <ul className="space-y-2">
         {look.pieces.map((p, i) => (

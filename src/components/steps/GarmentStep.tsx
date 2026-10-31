@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useEffectEvent, useState, useSyncExternalStore } from "react";
+import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { analyzeGarment, errorCode, FlowError, type GarmentAnalysis } from "@/lib/flow";
 import { describeGarmentColor } from "@/lib/color/garment";
@@ -53,6 +53,12 @@ export function GarmentStep({
   const [link, setLink] = useState("");
   const [linkBusy, setLinkBusy] = useState(false);
   const [linkFound, setLinkFound] = useState<{ url: string; title: string | null; images: string[] } | null>(null);
+  // "Use another photo" reopens every way in (upload, paste, link, demos), keeping the
+  // current analysis until a new one replaces it.
+  const [picking, setPicking] = useState(false);
+  // Requests still loading (store link, demo, clipboard) remember the pick they started in;
+  // after a newer pick or "Keep the current one", their result is dropped.
+  const pickId = useRef(0);
 
   useEffect(() => {
     fetch("/demo/garments.json")
@@ -62,8 +68,11 @@ export function GarmentStep({
   }, []);
 
   const run = async (file: Blob, source?: GarmentAnalysis["source"]) => {
+    pickId.current++;
+    setLinkBusy(false);
     setLastFile(file);
     setError(null);
+    setPicking(false);
     setAnalysis(null);
     setStage("reading");
     try {
@@ -83,7 +92,7 @@ export function GarmentStep({
   // A photo copied on the store page works like an upload: a store that blocks our link
   // fetch can't block the person's own browser. Cmd/Ctrl+V anywhere on this step…
   const onPaste = useEffectEvent((e: ClipboardEvent) => {
-    if (analysis || stage !== "idle") return;
+    if ((analysis && !picking) || stage !== "idle") return;
     const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
     if (!file) return;
     e.preventDefault();
@@ -97,37 +106,44 @@ export function GarmentStep({
   // …or a button, for phones where there's no keyboard shortcut to paste with.
   const canPaste = useSyncExternalStore(noSubscribe, () => !!navigator.clipboard?.read, () => false);
   const pasteFromClipboard = async () => {
+    const id = ++pickId.current;
     setError(null);
     try {
       for (const item of await navigator.clipboard.read()) {
         const type = item.types.find((ty) => ty.startsWith("image/"));
-        if (type) return void run(await item.getType(type));
+        if (!type) continue;
+        const blob = await item.getType(type);
+        if (id === pickId.current) void run(blob);
+        return;
       }
     } catch {
       /* permission refused or nothing readable: same advice as an empty clipboard */
     }
-    setError(t("errors.pasteNoImage"));
+    if (id === pickId.current) setError(t("errors.pasteNoImage"));
   };
 
   /** A product photo from the store page, through our same-origin proxy. */
-  const pickLinkImage = async (src: string, found: { url: string; title: string | null }) => {
+  const pickLinkImage = async (src: string, found: { url: string; title: string | null }, id = ++pickId.current) => {
     setLinkBusy(true);
     setError(null);
     try {
       const res = await fetch(`/api/garment/link?image=${encodeURIComponent(src)}`);
       if (!res.ok) throw new FlowError("linkNoImage");
+      const blob = await res.blob();
+      if (id !== pickId.current) return;
       setLinkFound(null);
-      void run(await res.blob(), found);
+      void run(blob, found);
     } catch (e) {
-      setError(t(`errors.${errorCode(e)}`));
+      if (id === pickId.current) setError(t(`errors.${errorCode(e)}`));
     } finally {
-      setLinkBusy(false);
+      if (id === pickId.current) setLinkBusy(false);
     }
   };
 
   const submitLink = async () => {
     const url = link.trim();
     if (!url) return;
+    const id = ++pickId.current;
     setLinkBusy(true);
     setError(null);
     setLinkFound(null);
@@ -138,29 +154,50 @@ export function GarmentStep({
         body: JSON.stringify({ url }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string; title?: string | null; images?: string[] };
+      if (id !== pickId.current) return;
       if (!res.ok || !data.images?.length) throw new FlowError(data.error ?? "linkUnreachable");
       const found = { url, title: data.title ?? null, images: data.images };
       setLinkBusy(false);
       // One photo: straight to the analysis. Several: let the person pick the clearest one.
-      if (found.images.length === 1) await pickLinkImage(found.images[0], found);
+      if (found.images.length === 1) await pickLinkImage(found.images[0], found, id);
       else setLinkFound(found);
     } catch (e) {
+      if (id !== pickId.current) return;
       setError(t(`errors.${errorCode(e)}`));
       setLinkBusy(false);
     }
   };
 
   const pickDemo = async (d: DemoGarment) => {
+    const id = ++pickId.current;
     try {
       const res = await fetch(d.src);
       if (!res.ok) throw new Error("demo_unavailable");
-      await run(await res.blob());
+      const blob = await res.blob();
+      if (id === pickId.current) await run(blob);
     } catch {
-      setError(t("errors.imageUnreadable"));
+      if (id === pickId.current) setError(t("errors.imageUnreadable"));
     }
   };
 
+  /** Back to the current garment, dropping whatever the picker is still loading. */
+  const keepCurrent = () => {
+    pickId.current++;
+    setLinkBusy(false);
+    setError(null);
+    setPicking(false);
+  };
+
+  const pickAnother = () => {
+    setPicking(true);
+    setError(null);
+    setLink("");
+    setLinkFound(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const busy = stage !== "idle";
+  const showPicker = (!analysis || picking) && !busy;
   const set = <K extends keyof GarmentAttributes>(k: K, v: GarmentAttributes[K]) =>
     setAttrs((a) => (a ? { ...a, [k]: v, uncertain: a.uncertain.filter((u) => u !== k) } : a));
   const opts = <T extends string>(group: string, values: readonly T[]) =>
@@ -183,7 +220,7 @@ export function GarmentStep({
         subtitle={complement ? t("garment.complementSubtitle") : t("garment.subtitle")}
       />
 
-      {!analysis && !busy && (
+      {showPicker && (
         <Card className="flex flex-col items-center gap-4 border-dashed py-10 text-center">
           <div className="text-5xl" aria-hidden>
             👗
@@ -243,10 +280,16 @@ export function GarmentStep({
               </div>
             </div>
           )}
-          {onBack && (
-            <Button variant="ghost" onClick={onBack}>
-              {t("nav.back")}
+          {analysis ? (
+            <Button variant="ghost" onClick={keepCurrent}>
+              {t("garment.keepCurrent")}
             </Button>
+          ) : (
+            onBack && (
+              <Button variant="ghost" onClick={onBack}>
+                {t("nav.back")}
+              </Button>
+            )
           )}
           {demos.length > 0 && (
             <div className="w-full pt-2">
@@ -273,7 +316,7 @@ export function GarmentStep({
 
       {error && <ErrorNote onRetry={lastFile ? () => run(lastFile, analysis?.source) : undefined}>{error}</ErrorNote>}
 
-      {analysis && attrs && (
+      {analysis && attrs && !picking && (
         <>
           <Card className="space-y-4">
             <div className={analysis.isolatedUrl ? "grid grid-cols-2 gap-3" : "mx-auto max-w-[260px]"}>
@@ -303,7 +346,9 @@ export function GarmentStep({
               {analysis.multicolor && <p className="mt-3 text-xs text-muted">{t("garment.multicolor")}</p>}
             </div>
             <div className="flex justify-end">
-              <FilePicker label={t("garment.replace")} onFile={(f) => run(f)} variant="secondary" />
+              <Button variant="secondary" onClick={pickAnother}>
+                {t("garment.replace")}
+              </Button>
             </div>
           </Card>
 
