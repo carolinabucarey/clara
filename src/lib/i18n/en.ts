@@ -269,13 +269,11 @@ export const en = {
     linkSent: "I sent an email to {email}. Open its link in this same browser: you’ll be signed in here without losing anything.",
     code: "Got a code instead? Enter it here",
     verify: "Sign in",
-    google: "Continue with Google",
     otherEmail: "Use another email",
     callbackDone: "You're signed in. Go back to the Clara tab: your look is waiting there.",
     callbackFailed: "I couldn't finish signing you in. Open the email link in the same browser where you asked for it, or request a new one.",
     backToClara: "Open Clara",
     cancel: "Cancel",
-    or: "or",
     consent: "Also save my photos and measurements, so I don't have to take them again. I can delete them anytime.",
     errors: {
       invalidEmail: "Check the email address.",

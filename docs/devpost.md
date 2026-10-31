@@ -24,7 +24,7 @@ Clara starts from the garment *you* chose: a screenshot from any online store or
 6. **Make it work.** If the color doesn't flatter you, YouCam's Makeup Virtual Try-On applies a lipstick in your undertone on your photo, with a before and after. Clara can also recolor the same piece into your palette and try it on again. Cut rescues (belt, tuck, layer, shoes) come from the same evidence.
 7. **The full look.** Tried a top? Add the bottom (or a jacket) and Clara tries them on you together, then tells you how they work together: whether the colors read as one long line or cut you in two, whether the volume is balanced, where the top meets the rise. With only one piece, she tells you which colors and cuts to look for.
 8. **Hair and makeup.** YouCam reads your face shape, and Clara suggests three haircuts from YouCam's hairstyle catalog, each with its reason ("a fringe visually shortens your oblong face"). If you want makeup, she suggests blush, eyes, liner and lips in your undertone that let your outfit's color lead, and tries it all on your selfie, before and after. You choose which haircut styles to see and whether to see makeup; Clara never guesses your gender.
-9. **Which one, and keep it.** Clara compares the pieces you tried and picks the best for you. Sign in with an emailed code (or Google) to save your looks; with your OK, your profile is saved too, so next time you skip the photos.
+9. **Which one, and keep it.** Clara compares the pieces you tried and picks the best for you. Sign in with an emailed link to save your looks; with your OK, your profile is saved too, so next time you skip the photos.
 
 **For the shopper:** fewer regrets, and a reason behind every recommendation.
 
@@ -48,7 +48,7 @@ Clara starts from the garment *you* chose: a screenshot from any online store or
 - **Proportions measured in the browser.** MediaPipe Pose Landmarker plus its segmentation mask: we measure shoulder, waist and hip widths on the silhouette, not on the joints, so the body photo never has to leave the device for this step.
 - **A deterministic verdict engine.** Color, cut and outfit rule tables produce the verdicts and attach evidence codes, ranges and confidence. Makeup and haircut suggestions follow the same pattern: every pick carries the measured reason behind it.
 - **Outfits by chaining try-ons.** YouCam changes one garment category per task, so Clara puts the pieces on in order (base first, layer last) and reuses any try-on that already shows them.
-- **Accounts on Supabase.** Email-code and Google sign-in that never leave the page, Postgres and Storage behind row-level security, and one-tap deletion of everything.
+- **Accounts on Supabase.** Email-link sign-in that never loses the look in progress, Postgres and Storage behind row-level security, and one-tap deletion of everything.
 - **Claude.** Claude Opus 5.5 only *writes* the verdict from that evidence. A validator rejects defect-oriented wording ("hide", "flaw", fruit-shaped body types), and template text takes over if anything fails. Claude vision pre-fills the garment's construction, because YouCam has no garment-analysis endpoint.
 - **English and Spanish** interface.
 

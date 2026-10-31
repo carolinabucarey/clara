@@ -1,11 +1,11 @@
 "use client";
 
-// Who is signed in, and the sign-in methods: an email (a link, or a 6-digit code when
-// the template includes one) or Google in a popup. Both keep this page as it is.
+// Who is signed in, and how to sign in: an email with a link (or a 6-digit code when
+// the template includes one). Either way this page stays as it is.
 
 import { useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { supabase, supabaseConfig } from "../supabase/client";
+import { supabase } from "../supabase/client";
 
 export function useAccount(onUserChange?: (user: User | null) => void): {
   enabled: boolean;
@@ -32,27 +32,6 @@ export function useAccount(onUserChange?: (user: User | null) => void): {
     return () => data.subscription.unsubscribe();
   }, [sb]);
   return { enabled: !!sb, ready, user };
-}
-
-let googleEnabled: Promise<boolean> | null = null;
-
-/** Whether Google sign-in is turned on in the Supabase project (public auth settings). */
-export function useGoogleSignIn(): boolean {
-  const [enabled, setEnabled] = useState(false);
-  useEffect(() => {
-    const config = supabaseConfig();
-    if (!config) return;
-    googleEnabled ??= fetch(`${config.url}/auth/v1/settings`, { headers: { apikey: config.key } })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { external?: { google?: boolean } } | null) => d?.external?.google === true)
-      .catch(() => false);
-    let alive = true;
-    googleEnabled.then((on) => alive && setEnabled(on));
-    return () => {
-      alive = false;
-    };
-  }, []);
-  return enabled;
 }
 
 export class AccountError extends Error {
@@ -88,17 +67,6 @@ export async function sendEmailCode(email: string) {
 export async function verifyEmailCode(email: string, token: string) {
   const { error } = await client().auth.verifyOtp({ email, token: token.trim(), type: "email" });
   if (error) throw authError(error, "invalidCode");
-}
-
-/** Google sign-in in a popup; /auth/callback completes it and the session reaches this tab. */
-export async function signInWithGoogle() {
-  const { data, error } = await client().auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo: `${window.location.origin}/auth/callback`, skipBrowserRedirect: true },
-  });
-  if (error || !data.url) throw new AccountError("generic");
-  const popup = window.open(data.url, "clara-sign-in", "width=480,height=640");
-  if (!popup) window.location.assign(data.url); // popup blocked: a full redirect still works
 }
 
 export async function signOut() {

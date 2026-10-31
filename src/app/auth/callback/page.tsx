@@ -1,8 +1,8 @@
 "use client";
 
-// Where the email link and the Google popup come back. The Supabase client finishes
-// the PKCE exchange on load and the session reaches the Clara tab that asked for it.
-// The popup closes itself; an email link opened in a new tab says where to go next.
+// Where the email link comes back, in a new tab. The Supabase client finishes the
+// PKCE exchange on load, the session reaches the Clara tab that asked for it, and
+// this page says where to go next.
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -21,7 +21,6 @@ export default function AuthCallback() {
       return;
     }
     sb.auth.getSession().then(({ data }) => {
-      if (window.opener && data.session) return window.close();
       setState(data.session ? "done" : "failed");
     });
   }, []);

@@ -271,13 +271,11 @@ export const es: Dictionary = {
     linkSent: "Te envié un correo a {email}. Abre el link en este mismo navegador: vas a entrar aquí sin perder nada.",
     code: "¿Te llegó un código? Escríbelo aquí",
     verify: "Entrar",
-    google: "Continuar con Google",
     otherEmail: "Usar otro correo",
     callbackDone: "Ya entraste. Vuelve a la pestaña de Clara: tu look te está esperando ahí.",
     callbackFailed: "No pude terminar de iniciar tu sesión. Abre el link del correo en el mismo navegador donde lo pediste, o pide uno nuevo.",
     backToClara: "Abrir Clara",
     cancel: "Cancelar",
-    or: "o",
     consent: "Guardar también mis fotos y medidas, para no tener que sacarlas de nuevo. Puedo borrarlas cuando quiera.",
     errors: {
       invalidEmail: "Revisa el correo.",

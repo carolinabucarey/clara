@@ -90,7 +90,7 @@ Browser (Next.js client)                 Server (Next.js route handlers)        
 - outfit, makeup, haircut rules          /api/garment  (Claude vision)             face-attr-analysis
 - wizard UI, share card             ◀──  /api/verdict  (rules → Claude text)
         │                                /api/account  (DELETE, service role)
-        └── supabase-js (RLS) ──▶  Supabase: Auth (email code, Google), Postgres, Storage
+        └── supabase-js (RLS) ──▶  Supabase: Auth (email link), Postgres, Storage
 ```
 
 - `src/lib/youcam/` — server client (`client.ts`), routes helpers, error mapping, dev-only result cache.
@@ -131,11 +131,12 @@ npm run dev
 
 1. Create a Supabase project (the Vercel Marketplace integration also sets the three variables in Vercel).
 2. Run `supabase/migrations/0001_accounts.sql` (SQL editor, or `supabase db push`).
-3. *Authentication → Email Templates → Magic Link*: include `{{ .Token }}` so the email carries the 6-digit code
-   Clara asks for (signing in never leaves the page, so nothing in progress is lost).
-4. *Authentication → URL Configuration*: add your site URL and `<site>/auth/callback` as a redirect URL.
-5. Optional: *Authentication → Providers → Google* with an OAuth client from Google Cloud. Google sign-in opens
-   in a popup and finishes on `/auth/callback`.
+3. *Authentication → URL Configuration*: set the site URL and add `<site>/auth/callback` as a redirect URL.
+   Sign-in is an email link: opened in a new tab of the same browser, it finishes on `/auth/callback` and the
+   session reaches the Clara tab, so nothing in progress is lost.
+4. Optional, for production: Supabase's built-in email sends only a few messages per hour. Set up custom SMTP
+   (for example Resend); that also unlocks the email templates, and adding `{{ .Token }}` to the Magic Link
+   template lets people type a 6-digit code in Clara instead of opening the link.
 
 ### Tests
 
