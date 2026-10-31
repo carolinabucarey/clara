@@ -85,8 +85,11 @@ export function BeautySection({
   const kept = steps.filter((s) => !look.makeupOff?.includes(s.category));
   const effects = makeupEffects(kept);
 
-  const hairKey = chosen ? `${me.selfieWideUrl}|${chosen}` : null;
-  const faceKey = `${me.selfieWideUrl}|${chosen ?? ""}|${JSON.stringify(effects)}`;
+  // Your own hair color, unless the cut you picked brings its own on purpose.
+  const ownColor = !chosenTemplate?.changesColor;
+  const hairSpec = chosen ? `${chosen}|${ownColor ? "own-color" : "template-color"}` : "";
+  const hairKey = chosen ? `${me.selfieWideUrl}|${hairSpec}` : null;
+  const faceKey = `${me.selfieWideUrl}|${hairSpec}|${JSON.stringify(effects)}`;
   const faceUrl = look.faceKey === faceKey ? look.faceUrl : undefined;
   const faceError = look.faceKey === faceKey ? look.faceError : undefined;
   const stale = !!look.faceUrl && look.faceKey !== faceKey;
@@ -105,7 +108,7 @@ export function BeautySection({
     try {
       let hairUrl = hairKey && look.hairKey === hairKey ? look.hairUrl : undefined;
       if (chosen && !hairUrl) {
-        hairUrl = await applyHairstyle(me.selfieWideBlob, chosen);
+        hairUrl = await applyHairstyle(me.selfieWideBlob, chosen, ownColor);
         onUpdateLook({ hairUrl, hairKey: hairKey! });
       }
       const url = effects.length > 0 ? await applyMakeupLook(effects, chosen ? hairUrl! : null, me.selfieWideBlob) : hairUrl!;

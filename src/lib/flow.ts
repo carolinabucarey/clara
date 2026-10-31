@@ -7,10 +7,11 @@ import { buildColorProfile } from "./color/profile";
 import { DEFAULT_ATTRIBUTES } from "./garment/defaults";
 import { dominantColors, looksMulticolor } from "./color/dominant";
 import { flattenOnto, recolorPixels } from "./color/recolor";
+import { hairColorChanged, hairStats, transferHairColor } from "./color/hair";
 import { describeGarmentColor } from "./color/garment";
 import { canvasToBlob, faceCrop, getPixels, loadImage, prepareUpload, toCanvas, type Rect } from "./image";
 import { measureBody, PoseMeasurementError, LM, type Landmark } from "./pose/measure";
-import { detectFaces, detectPose } from "./pose/vision";
+import { detectFaces, detectPose, segmentHair } from "./pose/vision";
 import { fidelityIssues, meanDeltaE, type FidelityIssue } from "./pose/fidelity";
 import { readFaceShape, readSkinTone, runYouCam, YouCamTaskError } from "./youcam/browser";
 import { FACE_ATTRIBUTES, FEATURES, lipstickEffect, type MakeupEffect } from "./youcam/features";
@@ -287,11 +288,41 @@ export async function tryOnOutfit(
   return url;
 }
 
-/** Hairstyle try-on on the head-and-shoulders selfie, keeping the person's own hair color. */
-export async function applyHairstyle(selfieWide: Blob, templateId: string) {
-  const res = await runYouCam(FEATURES.hairTransfer, { src: selfieWide, params: { template_id: templateId, hair_color: "src" } });
+/**
+ * Hairstyle try-on on a head-and-shoulders photo, keeping the person's own hair color.
+ * YouCam's "src" color is its own reading of the photo and can be far off (dark hair
+ * coming back platinum), so unless the template brings its own color on purpose, the
+ * hair is measured before and after and the original color is put back if it moved.
+ */
+export async function applyHairstyle(src: Blob, templateId: string, keepColor = true) {
+  const res = await runYouCam(FEATURES.hairTransfer, { src, params: { template_id: templateId, hair_color: "src" } });
   if (!res.imageUrl) throw new FlowError("generic");
-  return res.imageUrl;
+  if (!keepColor) return res.imageUrl;
+  const restored = await restoreHairColor(src, res.imageUrl).catch((e) => {
+    console.warn("hair color check failed", e);
+    return null;
+  });
+  return restored ?? res.imageUrl;
+}
+
+/** The try-on with the person's hair color put back, or null when it kept it (local, no API cost). */
+async function restoreHairColor(src: Blob, resultUrl: string): Promise<string | null> {
+  const [before, after] = await Promise.all([loadImage(src), loadImage(resultUrl)]);
+  const a = toCanvas(before, 1024);
+  const b = toCanvas(after, 1024);
+  const maskA = await segmentHair(a);
+  const maskB = await segmentHair(b);
+  if (!maskA || !maskB) return null;
+  const pa = getPixels(a);
+  const pb = getPixels(b);
+  const own = hairStats(pa.data, a.width, a.height, maskA);
+  const now = hairStats(pb.data, b.width, b.height, maskB);
+  if (!own || !now || !hairColorChanged(own, now)) return null;
+  // The wrong color is often a near-white that the first read half misses.
+  const all = (await segmentHair(b, { lightHair: true })) ?? maskB;
+  transferHairColor(pb.data, b.width, b.height, all, hairStats(pb.data, b.width, b.height, all) ?? now, own);
+  b.getContext("2d")!.putImageData(pb, 0, 0);
+  return URL.createObjectURL(await canvasToBlob(b, "image/jpeg", 0.92));
 }
 
 /** The suggested makeup, on the hairstyle result when there is one, otherwise on the selfie. */
