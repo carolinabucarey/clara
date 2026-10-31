@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
-import { AccountError, sendEmailCode, signInWithGoogle, verifyEmailCode } from "@/lib/account/session";
+import { AccountError, sendEmailCode, signInWithGoogle, useGoogleSignIn, verifyEmailCode } from "@/lib/account/session";
 import { Button, ErrorNote } from "./ui";
 
 const input = "h-11 w-full rounded-xl border border-line bg-paper px-3 text-base text-ink focus:border-ink focus:outline-none";
@@ -23,6 +23,7 @@ export function AuthDialog({
 }) {
   const { t } = useI18n();
   const ref = useRef<HTMLDialogElement>(null);
+  const google = useGoogleSignIn();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
@@ -136,14 +137,18 @@ export function AuthDialog({
           </Button>
         </div>
 
-        <div className="flex items-center gap-3 text-xs text-muted">
-          <span className="h-px flex-1 bg-line" />
-          {t("account.or")}
-          <span className="h-px flex-1 bg-line" />
-        </div>
-        <Button type="button" variant="secondary" className="w-full" disabled={busy} onClick={() => act(signInWithGoogle)}>
-          {t("account.google")}
-        </Button>
+        {google && (
+          <>
+            <div className="flex items-center gap-3 text-xs text-muted">
+              <span className="h-px flex-1 bg-line" />
+              {t("account.or")}
+              <span className="h-px flex-1 bg-line" />
+            </div>
+            <Button type="button" variant="secondary" className="w-full" disabled={busy} onClick={() => act(signInWithGoogle)}>
+              {t("account.google")}
+            </Button>
+          </>
+        )}
       </form>
     </dialog>
   );

@@ -5,7 +5,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { supabase } from "../supabase/client";
+import { supabase, supabaseConfig } from "../supabase/client";
 
 export function useAccount(onUserChange?: (user: User | null) => void): {
   enabled: boolean;
@@ -32,6 +32,27 @@ export function useAccount(onUserChange?: (user: User | null) => void): {
     return () => data.subscription.unsubscribe();
   }, [sb]);
   return { enabled: !!sb, ready, user };
+}
+
+let googleEnabled: Promise<boolean> | null = null;
+
+/** Whether Google sign-in is turned on in the Supabase project (public auth settings). */
+export function useGoogleSignIn(): boolean {
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => {
+    const config = supabaseConfig();
+    if (!config) return;
+    googleEnabled ??= fetch(`${config.url}/auth/v1/settings`, { headers: { apikey: config.key } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { external?: { google?: boolean } } | null) => d?.external?.google === true)
+      .catch(() => false);
+    let alive = true;
+    googleEnabled.then((on) => alive && setEnabled(on));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return enabled;
 }
 
 export class AccountError extends Error {
