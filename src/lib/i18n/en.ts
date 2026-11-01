@@ -149,6 +149,8 @@ export const en = {
     betterTitle: "The same piece in your color",
     betterBody: "If the store has it in a shade close to this one, it will work better for you.",
     betterTry: "Try it on me in this color",
+    betterClosest: "Closest",
+    betterMore: "More of your colors",
     betterApplying: "Trying on your color with YouCam…",
     yours: "Your pick",
     inYourColor: "In your color",

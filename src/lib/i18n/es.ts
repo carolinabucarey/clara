@@ -151,6 +151,8 @@ export const es: Dictionary = {
     betterTitle: "La misma prenda en tu color",
     betterBody: "Si la tienda la tiene en un tono cercano a este, te va a funcionar mejor.",
     betterTry: "Pruébamela en este color",
+    betterClosest: "El más cercano",
+    betterMore: "Más de tus colores",
     betterApplying: "Probándote tu color con YouCam…",
     yours: "Tu elección",
     inYourColor: "En tu color",

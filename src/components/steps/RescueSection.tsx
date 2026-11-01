@@ -48,22 +48,35 @@ export function RescueSection({
   const started = useRef(false);
   const [betterBusy, setBetterBusy] = useState(false);
   const [betterError, setBetterError] = useState<string | null>(null);
+  // Keeps the side by side after picking another color over a try-on, waiting for the new one.
+  const [betterCompared, setBetterCompared] = useState(false);
   // Recoloring needs the garment isolated by YouCam and a single main color.
   const canRecolor = !!trial.garment.isolatedUrl && trial.garment.attrs.pattern === "solid" && !trial.garment.multicolor;
+  // Clara's color (the closest to the piece's) first, then the rest of the palette to try.
+  const betterColors = result.betterColor ? [result.betterColor, ...result.palette.filter((c) => c !== result.betterColor)] : [];
+  const betterShown = trial.betterPick ?? trial.betterHex ?? result.betterColor;
 
   const runBetter = async () => {
-    if (!result.betterColor) return;
+    if (!betterShown) return;
     setBetterBusy(true);
     setBetterError(null);
     try {
       // Over the same base as "your choice", so the other pieces of the look stay on.
-      const { url, garmentUrl } = await tryOnBetterColor(me.bodyBlob, trial.garment, result.betterColor, trial.tryOnOverUrl);
-      onUpdate({ betterUrl: url, betterGarmentUrl: garmentUrl, betterHex: result.betterColor });
+      const { url, garmentUrl } = await tryOnBetterColor(me.bodyBlob, trial.garment, betterShown, trial.tryOnOverUrl);
+      onUpdate({ betterUrl: url, betterGarmentUrl: garmentUrl, betterHex: betterShown });
     } catch (e) {
       setBetterError(t(`errors.${errorCode(e)}`));
     } finally {
       setBetterBusy(false);
     }
+  };
+
+  // Like the lipstick, a new color waits for "Try it on me" so a stray tap doesn't spend a try-on.
+  const pickBetter = (hex: string) => {
+    if (hex === betterShown) return;
+    if (trial.betterUrl) setBetterCompared(true);
+    setBetterError(null);
+    onUpdate({ betterPick: hex === result.betterColor ? undefined : hex, betterUrl: undefined, betterGarmentUrl: undefined, betterHex: undefined });
   };
 
   const runLip = async () => {
@@ -191,7 +204,7 @@ export function RescueSection({
         </Card>
       )}
 
-      {result.betterColor && (
+      {result.betterColor && betterShown && (
         <Card className="space-y-3">
           <div className="flex items-center gap-4">
             <div className="flex shrink-0 items-center">
@@ -199,21 +212,22 @@ export function RescueSection({
               <span className="px-2 text-muted" aria-hidden>
                 →
               </span>
-              <Swatch hex={result.betterColor} size={40} />
+              <Swatch hex={betterShown} size={40} />
             </div>
             <div>
               <h2 className="font-display text-lg text-ink">{t("rescue.betterTitle")}</h2>
               <p className="text-sm text-muted">{t("rescue.betterBody")}</p>
             </div>
           </div>
-          {canRecolor && !trial.betterUrl && !betterBusy && (
-            <div className="flex justify-end">
-              <Button variant="secondary" onClick={runBetter}>
-                {t("rescue.betterTry")}
-              </Button>
-            </div>
-          )}
-          {(betterBusy || trial.betterUrl) && (
+          <ShadePicker
+            shades={betterColors.map((c) => ({ name: c, colors: [c] }))}
+            value={betterShown}
+            onChange={pickBetter}
+            label={(c) => c.toUpperCase()}
+            disabled={betterBusy}
+            captions={{ own: t("rescue.betterClosest"), others: t("rescue.betterMore") }}
+          />
+          {(betterBusy || trial.betterUrl || betterCompared) && (
             <div className="grid grid-cols-2 gap-3">
               <figure>
                 <ZoomableImage src={trial.tryOnUrl ?? trial.garment.originalUrl} className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
@@ -223,10 +237,17 @@ export function RescueSection({
                 {trial.betterUrl ? (
                   <ZoomableImage src={trial.betterUrl} className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
                 ) : (
-                  <SkeletonImage label={t("rescue.betterApplying")} />
+                  <SkeletonImage label={betterBusy ? t("rescue.betterApplying") : undefined} />
                 )}
                 <figcaption className="mt-1.5 text-center text-xs text-muted">{t("rescue.inYourColor")}</figcaption>
               </figure>
+            </div>
+          )}
+          {canRecolor && !trial.betterUrl && !betterBusy && !betterError && (
+            <div className="flex justify-end">
+              <Button variant="secondary" onClick={runBetter}>
+                {t("rescue.betterTry")}
+              </Button>
             </div>
           )}
           {trial.betterUrl && !betterBusy && (
