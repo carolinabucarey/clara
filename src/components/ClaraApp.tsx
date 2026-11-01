@@ -161,6 +161,8 @@ export function ClaraApp() {
   const [profileSync, setProfileSync] = useState<{ saved: boolean; photos: string | null }>({ saved: false, photos: null });
   const [meFromAccount, setMeFromAccount] = useState(false);
   const [save, setSave] = useState<{ signature: string; status: "saving" | "saved" | "error" | "expired" } | null>(null);
+  /** Each look's signature when it was last saved or opened from the account, by look id. */
+  const [savedAs, setSavedAs] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const lastUser = useRef<string | null>(null);
   const ownedUrls = useRef(new Set<string>());
@@ -240,6 +242,7 @@ export function ClaraApp() {
     if (!look || !me || !uid) return;
     const signature = lookSignature(look, trials, me, goals, beauty);
     const index = lookIndex;
+    const lookId = look.id;
     setSave({ signature, status: "saving" });
     try {
       const order = wearOrder(look.pieces);
@@ -272,6 +275,7 @@ export function ClaraApp() {
       );
       if (lastUser.current !== uid) return;
       updateLook({ saved }, index);
+      setSavedAs((s) => ({ ...s, [lookId]: signature }));
       // With consent the first time; afterwards the account profile simply stays current.
       if (withProfile || profileSync.saved) {
         await saveProfile(me, { beauty, goals }, profileSync.photos !== photosOf(me));
@@ -300,6 +304,7 @@ export function ClaraApp() {
     setMe(null);
     setGoals([]);
     setLooks([]);
+    setSavedAs({});
     setComplement(null);
     setBack(null);
     setSave(null);
@@ -356,6 +361,24 @@ export function ClaraApp() {
 
   const account = useAccount((user) => onUserChange(user?.id ?? null));
 
+  // A look lives only in this tab until it's saved (signing in on another device doesn't save it):
+  // ask before the tab is closed or reloaded with a look that isn't saved as it is now.
+  const unsaved =
+    account.enabled &&
+    looks.some((l) => {
+      const pieces = Object.values(l.pieces);
+      return pieces.length > 0 && pieces.every((i) => trials[i!]) && savedAs[l.id] !== lookSignature(l, trials, me, goals, beauty);
+    });
+  useEffect(() => {
+    if (!unsaved) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [unsaved]);
+
   /** Brings a saved look back into the session to change it; saving again updates it. */
   const editSavedLook = async (saved: SavedLook) => {
     if (!me) {
@@ -377,27 +400,26 @@ export function ClaraApp() {
     const lookSpec = `${saved.hairColor?.hex ?? ""}|${JSON.stringify(makeupEffects(saved.makeup ?? []))}`;
     const styled = !!(saved.facePath || saved.fullPath);
     const outfitShown = loaded.slots.length > 1 ? loaded.outfitUrl : loaded.trials[0]?.tryOnUrl;
+    const opened: Look = {
+      id: newId(),
+      pieces,
+      saved,
+      name: saved.name ?? undefined,
+      outfitUrl: loaded.outfitUrl,
+      outfitKey: loaded.outfitUrl ? outfitKey(pieces, all, me.bodyUrl) : undefined,
+      hairColor: styled ? saved.hairColor?.hex : undefined,
+      makeupOff: saved.makeup ? MAKEUP_CATEGORIES.filter((c) => !saved.makeup!.some((m) => m.category === c)) : undefined,
+      makeupShades: saved.makeup ? Object.fromEntries(saved.makeup.map((m) => [m.category, shadeOf(m)])) : undefined,
+      faceUrl: loaded.faceUrl,
+      faceKey: loaded.faceUrl ? `${me.selfieWideUrl}|${lookSpec}` : undefined,
+      fullUrl: loaded.fullUrl,
+      fullKey: loaded.fullUrl && outfitShown ? `${outfitShown}|${lookSpec}` : undefined,
+      faceMakeup: saved.makeup ?? undefined,
+      faceHairColor: saved.hairColor,
+    };
     setTrials(all);
-    setLooks((ls) => [
-      ...ls,
-      {
-        id: newId(),
-        pieces,
-        saved,
-        name: saved.name ?? undefined,
-        outfitUrl: loaded.outfitUrl,
-        outfitKey: loaded.outfitUrl ? outfitKey(pieces, all, me.bodyUrl) : undefined,
-        hairColor: styled ? saved.hairColor?.hex : undefined,
-        makeupOff: saved.makeup ? MAKEUP_CATEGORIES.filter((c) => !saved.makeup!.some((m) => m.category === c)) : undefined,
-        makeupShades: saved.makeup ? Object.fromEntries(saved.makeup.map((m) => [m.category, shadeOf(m)])) : undefined,
-        faceUrl: loaded.faceUrl,
-        faceKey: loaded.faceUrl ? `${me.selfieWideUrl}|${lookSpec}` : undefined,
-        fullUrl: loaded.fullUrl,
-        fullKey: loaded.fullUrl && outfitShown ? `${outfitShown}|${lookSpec}` : undefined,
-        faceMakeup: saved.makeup ?? undefined,
-        faceHairColor: saved.hairColor,
-      },
-    ]);
+    setLooks((ls) => [...ls, opened]);
+    setSavedAs((s) => ({ ...s, [opened.id]: lookSignature(opened, all, me, goals, beauty) }));
     setCurrent(offset);
     setBack(null);
     setStep("look");
@@ -407,6 +429,10 @@ export function ClaraApp() {
   const renamedLook = (renamed: SavedLook) => {
     const rename = (l: Look) => (l.saved?.id === renamed.id ? { ...l, saved: renamed, name: renamed.name ?? undefined } : l);
     setLooks((ls) => ls.map(rename));
+    const resigned = looks
+      .filter((l) => l.saved?.id === renamed.id && savedAs[l.id] === lookSignature(l, trials, me, goals, beauty))
+      .map((l) => [l.id, lookSignature(rename(l), trials, me, goals, beauty)] as const);
+    setSavedAs((s) => ({ ...s, ...Object.fromEntries(resigned) }));
     // Still "Saved" if it was: the account already has the new name.
     if (!look) return;
     const before = lookSignature(look, trials, me, goals, beauty);
@@ -534,6 +560,7 @@ export function ClaraApp() {
             setAuthOpen(false);
             setPendingSave(false);
           }}
+          saving={pendingSave}
           consent={pendingSave && !profileSync.saved ? { checked: consent, onChange: setConsent } : undefined}
         />
       )}

@@ -10,15 +10,20 @@ const input = "h-11 w-full rounded-xl border border-line bg-paper px-3 text-base
 /**
  * Sign in without leaving the page: an email link (opened in another tab), or a
  * code when the email template includes one.
+ * The link works only in this browser (PKCE): opened on another device it signs in nowhere,
+ * and a look waiting to be saved stays unsaved, so the dialog says so plainly.
  * When opened to save a look, it also asks whether to keep the photos.
  */
 export function AuthDialog({
   open,
   onClose,
+  saving = false,
   consent,
 }: {
   open: boolean;
   onClose: () => void;
+  /** Opened by "Save look": the look is saved in this tab once the person signs in here. */
+  saving?: boolean;
   consent?: { checked: boolean; onChange: (v: boolean) => void };
 }) {
   const { t } = useI18n();
@@ -89,10 +94,15 @@ export function AuthDialog({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
+            <span className="block text-xs text-muted">{t("account.linkHint")}</span>
           </label>
         ) : (
           <div className="space-y-2">
-            <p className="rounded-2xl bg-sage-soft px-3 py-2.5 text-sm text-ink">{t("account.linkSent", { email })}</p>
+            <div className="space-y-1.5 rounded-2xl bg-amber-soft px-3 py-2.5 text-sm text-ink" role="status">
+              <p>{t("account.linkSent", { email })}</p>
+              <p className="font-semibold">{t(saving ? "account.sameDeviceSave" : "account.sameDevice")}</p>
+              <p className="text-xs text-ink/80">{t("account.mailAppTip")}</p>
+            </div>
             <label className="block space-y-1.5">
               <span className="text-sm font-semibold">{t("account.code")}</span>
               <input
