@@ -41,6 +41,7 @@ export interface SavedHairstyle {
 
 export interface SavedLook {
   id: string;
+  name: string | null;
   createdAt: string;
   updatedAt: string | null;
   pieces: SavedPiece[];
@@ -53,6 +54,7 @@ export interface SavedLook {
 }
 
 export interface LookToSave {
+  name: string | null;
   pieces: Array<{ slot: Slot; trial: Trial }>;
   outfitUrl: string | null;
   outfit: OutfitResult | null;
@@ -64,6 +66,7 @@ export interface LookToSave {
 
 interface LookRow {
   id: string;
+  name?: string | null;
   created_at: string;
   updated_at?: string | null;
   pieces: SavedPiece[];
@@ -78,6 +81,7 @@ interface LookRow {
 function fromRow(r: LookRow): SavedLook {
   return {
     id: r.id,
+    name: r.name ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at ?? null,
     // Re-describe the stored hex so saved looks pick up fixes to color naming.
@@ -90,6 +94,11 @@ function fromRow(r: LookRow): SavedLook {
     hairstyle: r.hairstyle,
   };
 }
+
+export const LOOK_NAME_MAX = 60;
+
+/** A look's name as stored: trimmed, at most LOOK_NAME_MAX characters, null when empty. */
+export const lookName = (name: string | null | undefined) => name?.trim().slice(0, LOOK_NAME_MAX).trim() || null;
 
 export function lookImagePaths(look: SavedLook): string[] {
   return [look.fullPath, look.outfitPath, look.facePath, ...look.pieces.flatMap((p) => [p.garmentPath, p.tryOnPath, p.better?.tryOnPath])].filter(
@@ -148,6 +157,7 @@ export async function saveLook(input: LookToSave, existing?: SavedLook | null): 
       });
     }
     const row = {
+      name: lookName(input.name),
       pieces,
       outfit_verdict: input.outfit,
       outfit_path: outfitPath,
@@ -179,6 +189,20 @@ export async function listLooks(): Promise<SavedLook[]> {
   const { data, error } = await sb.from("looks").select("*").eq("user_id", uid).order("created_at", { ascending: false });
   if (error) throw new SaveError("generic");
   return (data as LookRow[]).map(fromRow);
+}
+
+/** Names a saved look, or clears its name, without touching its images. */
+export async function renameLook(look: SavedLook, name: string | null): Promise<SavedLook> {
+  const { sb, uid } = await signedInClient();
+  const { data, error } = await sb
+    .from("looks")
+    .update({ name: lookName(name) })
+    .eq("id", look.id)
+    .eq("user_id", uid)
+    .select()
+    .single<LookRow>();
+  if (error || !data) throw new SaveError("generic");
+  return fromRow(data);
 }
 
 export async function deleteLook(look: SavedLook) {
