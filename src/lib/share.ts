@@ -66,9 +66,15 @@ async function card(title: string) {
   ctx.fillStyle = "#241c17";
   ctx.font = `600 64px ${serif}`;
   ctx.fillText("Clara", 72, 120);
-  ctx.font = `400 30px ${sans}`;
+  // A long look name gets a smaller size, and is narrowed only if it still doesn't fit.
+  let size = 30;
+  ctx.font = `400 ${size}px ${sans}`;
+  while (size > 22 && ctx.measureText(title).width > W - 144) {
+    size -= 2;
+    ctx.font = `400 ${size}px ${sans}`;
+  }
   ctx.fillStyle = "#6f625a";
-  ctx.fillText(title, 72, 168);
+  ctx.fillText(title, 72, 168, W - 144);
   return { canvas, ctx, serif, sans };
 }
 

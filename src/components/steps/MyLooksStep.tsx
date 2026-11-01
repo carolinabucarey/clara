@@ -171,7 +171,7 @@ export function MyLooksStep({
       })),
       outfit: look.outfit ? { verdict: look.outfit.verdict, label: t(`look.levels.${look.outfit.verdict}`) } : undefined,
       palette: look.pieces.find((p) => p.result)?.result?.palette ?? [],
-      labels: { title: t("look.title"), footer: t("privacy") },
+      labels: { title: look.name ?? t("look.title"), footer: t("privacy") },
     });
 
   const rename = async (look: SavedLook) => {

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n/context";
+import { lookName } from "@/lib/account/looks";
 import { checkTryOnFidelity, errorCode, tryOnOutfit } from "@/lib/flow";
 import { missingSlots, outfitKey, outfitPlan, wearOrder } from "@/lib/look";
 import { renderLookCard } from "@/lib/share";
@@ -127,7 +128,7 @@ export function LookStep({
       }),
       outfit: outfit ? { verdict: outfit.verdict, label: t(`look.levels.${outfit.verdict}`) } : undefined,
       palette,
-      labels: { title: t("look.title"), footer: t("privacy") },
+      labels: { title: lookName(look.name) ?? t("look.title"), footer: t("privacy") },
     });
 
   return (
