@@ -71,6 +71,8 @@ export interface Trial {
   betterUrl?: string;
   betterGarmentUrl?: string;
   betterHex?: string;
+  /** The look image ("your choice") the recolor was made to compare with: other pieces make it stale. */
+  betterLookUrl?: string;
   /** The try-on image changed the face noticeably (see lib/pose/fidelity). */
   fidelityWarning?: boolean;
   /** Set when this piece was tried on over another piece of its look (lib/look). */
@@ -114,7 +116,7 @@ const MAKEUP_CATEGORIES: MakeupCategory[] = ["blush", "eye_shadow", "eye_liner",
 const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 // Fields to clear when their inputs change.
-const STALE_BETTER: Partial<Trial> = { betterUrl: undefined, betterGarmentUrl: undefined, betterHex: undefined };
+const STALE_BETTER: Partial<Trial> = { betterUrl: undefined, betterGarmentUrl: undefined, betterHex: undefined, betterLookUrl: undefined };
 const STALE_VERDICT: Partial<Trial> = { result: undefined, draft: undefined, draftInputKey: undefined, lipUrl: undefined, lipBeforeUrl: undefined, betterPick: undefined, ...STALE_BETTER };
 const STALE_TRY_ON: Partial<Trial> = {
   tryOnUrl: undefined,
