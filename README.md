@@ -141,7 +141,11 @@ npm run dev
 2. Run the files in `supabase/migrations/` in order (SQL editor, or `supabase db push`).
 3. *Authentication → URL Configuration*: set the site URL and add `<site>/auth/callback` as a redirect URL.
    Sign-in is an email link: opened in a new tab of the same browser, it finishes on `/auth/callback` and the
-   session reaches the Clara tab, so nothing in progress is lost.
+   session reaches the Clara tab, so nothing in progress is lost. The link works only in the browser that asked
+   for it: opened on another device (or in an email app's own browser) it signs in nowhere, and a look waiting
+   to be saved stays unsaved in its tab. The sign-in dialog says so, `/auth/callback` explains it when it
+   happens, and the tab asks before closing or reloading while a look isn't saved. The code in step 4 avoids
+   the problem altogether: it can be read on any device and typed in the Clara tab.
 4. Optional, for production: Supabase's built-in email sends only a few messages per hour. Set up custom SMTP
    (for example Resend); that also unlocks the email templates, and adding `{{ .Token }}` to the Magic Link
    template lets people type a 6-digit code in Clara instead of opening the link.
