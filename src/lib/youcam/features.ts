@@ -14,8 +14,8 @@ export const FEATURES = {
   makeup: "makeup-vto",
   /** Background removal, used to isolate the garment before measuring its color. */
   removeBackground: "sod",
-  /** Hairstyle try-on from a preset template (v2.1 task endpoints). */
-  hairTransfer: "hair-transfer",
+  /** Hair color try-on: dyes the hair the person has, without touching the cut. */
+  hairColor: "hair-color",
   /** Face attributes: Clara only asks for the face shape and its aspect ratio. */
   faceAnalyzer: "face-attr-analysis",
 } as const;
@@ -26,13 +26,6 @@ export const ALLOWED_FEATURES = new Set<string>(Object.values(FEATURES));
 
 export function isFeature(value: string): value is Feature {
   return ALLOWED_FEATURES.has(value);
-}
-
-/** Version of each feature's task endpoints; file registration is always v2.0. */
-const TASK_VERSION: Partial<Record<Feature, string>> = { "hair-transfer": "v2.1" };
-
-export function taskVersion(feature: Feature): string {
-  return TASK_VERSION[feature] ?? "v2.0";
 }
 
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -108,9 +101,11 @@ export const PARAM_SCHEMAS: Record<Feature, z.ZodType<Record<string, unknown>>> 
     version: z.literal("1.0").default("1.0"),
   }),
   sod: z.object({}),
-  "hair-transfer": z.object({
-    template_id: z.string().regex(/^[\w-]{1,100}$/),
-    hair_color: z.enum(["ref", "src"]).default("src"),
+  "hair-color": z.object({
+    pattern: z.object({ name: z.literal("full") }),
+    palettes: z
+      .array(z.object({ color: hex, color_intensity: intensity, shine_intensity: intensity.optional() }))
+      .length(1),
   }),
   "face-attr-analysis": z.object({
     features: z.array(z.enum(FACE_ATTRIBUTES)).min(1).max(FACE_ATTRIBUTES.length),
@@ -125,7 +120,7 @@ export const FEATURE_INPUTS: Record<Feature, { ref: boolean }> = {
   cloth: { ref: true },
   "makeup-vto": { ref: false },
   sod: { ref: false },
-  "hair-transfer": { ref: false },
+  "hair-color": { ref: false },
   "face-attr-analysis": { ref: false },
 };
 
@@ -140,5 +135,13 @@ export function lipstickEffect(hexColor: string) {
       },
     ],
     version: "1.0" as const,
+  };
+}
+
+/** A single dye color over the whole head, strong enough to read, with a natural shine. */
+export function hairColorParams(hexColor: string) {
+  return {
+    pattern: { name: "full" as const },
+    palettes: [{ color: hexColor, color_intensity: 70, shine_intensity: 40 }],
   };
 }

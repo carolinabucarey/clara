@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { buildColorProfile } from "../color/profile";
-import { PARAM_SCHEMAS } from "../youcam/features";
+import { deltaE, hexToLab } from "../color/lab";
+import { hasKey } from "../i18n";
+import { hairColorParams, PARAM_SCHEMAS } from "../youcam/features";
 import { readFaceShape } from "../youcam/browser";
-import { makeupEffects, makeupFor } from "./makeup";
-import { judgeHairstyle, suggestHairstyles, tagTemplate, templatesFor, type HairTemplate } from "./hairstyles";
+import { makeupEffects, makeupFor, makeupShades, shadeOf } from "./makeup";
+import { hairColorsFor } from "./haircolor";
 
 const warm = buildColorProfile({ skin: "#d9a98a", hair: "#3b2a20", eye: "#4a3426" });
 
@@ -27,6 +29,32 @@ describe("makeup suggestion", () => {
     const params = { effects: makeupEffects(makeupFor(warm, "oval", [])), version: "1.0" };
     expect(PARAM_SCHEMAS["makeup-vto"].safeParse(params).success).toBe(true);
   });
+
+  it("offers Clara's shade first, then others to try, each named in both languages", () => {
+    const shades = makeupShades(warm);
+    for (const step of makeupFor(warm, null, [])) {
+      const options = shades[step.category];
+      expect(options[0].colors).toEqual(step.colors);
+      expect(options.length).toBeGreaterThan(2);
+      expect(new Set(options.map((o) => o.name)).size).toBe(options.length);
+      const ns = step.category === "lip_color" ? "lipsticks" : "shades";
+      for (const o of options) expect(hasKey("es", `${ns}.${o.name}`) && hasKey("en", `${ns}.${o.name}`)).toBe(true);
+    }
+  });
+
+  it("swaps in the shades the person picked, keeping Clara's intensity and placement", () => {
+    const clara = makeupFor(warm, "round", []);
+    const picked = makeupFor(warm, "round", [], { lip_color: "wine", eye_shadow: "smoky", blush: "not_a_shade" });
+    const wine = makeupShades(warm).lip_color.find((o) => o.name === "wine")!;
+    expect(picked[3]).toMatchObject({ code: "lip_try", colors: wine.colors, intensity: clara[3].intensity });
+    expect(shadeOf(picked[3])).toBe("wine");
+    expect(picked[1]).toMatchObject({ code: "eyes_try", pattern: clara[1].pattern, intensity: clara[1].intensity });
+    expect(picked[1].colors).toHaveLength(2);
+    expect(picked[0]).toEqual(clara[0]);
+    // Picking Clara's own shade is the same as not picking.
+    expect(makeupFor(warm, "round", [], Object.fromEntries(clara.map((s) => [s.category, shadeOf(s)])))).toEqual(clara);
+    expect(PARAM_SCHEMAS["makeup-vto"].safeParse({ effects: makeupEffects(picked), version: "1.0" }).success).toBe(true);
+  });
 });
 
 describe("face shape reading", () => {
@@ -40,93 +68,38 @@ describe("face shape reading", () => {
   });
 });
 
-describe("hairstyle suggestions", () => {
-  const catalog: HairTemplate[] = [
-    { id: "1", title: "Curly Bob", thumb: null, category: "Women" },
-    { id: "2", title: "Side-Swept Bangs", thumb: null, category: null },
-    { id: "3", title: "Textured Quiff", thumb: null, category: null },
-    { id: "4", title: "Long Straight", thumb: null, category: "Female" },
-    { id: "5", title: "Buzz Cut", thumb: null, category: "Men" },
-    { id: "6", title: "Layered Waves", thumb: null, category: null },
-  ];
+describe("hair color suggestions", () => {
+  const shades = (colors: Parameters<typeof buildColorProfile>[0]) => hairColorsFor(buildColorProfile(colors));
 
-  it("tags templates from their words", () => {
-    expect(tagTemplate(catalog[0])).toMatchObject({ group: "feminine", length: "medium", waves: true });
-    expect(tagTemplate(catalog[2])).toMatchObject({ group: "masculine", length: "short", volumeTop: true });
-    expect(tagTemplate(catalog[3]).group).toBe("feminine");
-    expect(tagTemplate(catalog[4]).group).toBe("masculine");
-  });
-
-  it("filters by the style the person chose, never by a guess", () => {
-    expect(templatesFor(catalog, "masculine").map((t) => t.id)).toEqual(["2", "3", "5", "6"]);
-    expect(templatesFor(catalog, "feminine").map((t) => t.id)).toEqual(["1", "2", "4", "6"]);
-    expect(templatesFor(catalog, "all")).toHaveLength(6);
-  });
-
-  it("puts fringe and width first for an oblong face", () => {
-    const picks = suggestHairstyles(catalog, "oblong", "all");
+  it("stays in the person's undertone and close to the depth of their hair", () => {
+    const cool = buildColorProfile({ skin: "#f1d3cf", hair: "#2a2220", eye: "#3a3a40" });
+    expect(cool.undertone).toBe("cool");
+    const picks = hairColorsFor(cool);
     expect(picks).toHaveLength(3);
-    expect(picks[0].code).toBe("oblong_fringe");
-    expect(picks.map((p) => p.templateId)).not.toContain("4");
+    expect(picks.every((c) => c.code === "cool")).toBe(true);
+    expect(picks.every((c) => Math.abs(hexToLab(c.hex).L - cool.hair!.L) < 20)).toBe(true);
   });
 
-  it("reads YouCam's real catalog titles and suggests only haircuts", () => {
-    const real: HairTemplate[] = [
-      { id: "female_messy_bun", title: "Messy Bun", thumb: null, category: "Female" },
-      { id: "female_bald", title: "Bald", thumb: null, category: "Female" },
-      { id: "all_bow_accents", title: "Bow Accents", thumb: null, category: "Female" },
-      { id: "all_wavy_bob_bangs", title: "Wavy Bob With Bangs", thumb: null, category: "Female" },
-      { id: "all_face_framing", title: "Face Framing Shag Cut", thumb: null, category: "Female" },
-      { id: "female_crewcut", title: "Crewcut", thumb: null, category: "Female" },
-      { id: "male_textured_crop", title: "Textured Crop", thumb: null, category: "Male" },
-    ];
-    expect(tagTemplate(real[0]).cut).toBe(false);
-    expect(tagTemplate(real[3])).toMatchObject({ group: "feminine", fringe: true, waves: true, cut: true });
-    expect(tagTemplate(real[4]).layers).toBe(true);
-    expect(tagTemplate(real[5]).length).toBe("short");
-    expect(tagTemplate(real[6])).toMatchObject({ group: "masculine", length: "short", volumeTop: true });
-    const picks = suggestHairstyles(real, "oblong", "feminine").map((p) => p.templateId);
-    expect(picks).not.toContain("female_messy_bun");
-    expect(picks).not.toContain("female_bald");
-    expect(picks).not.toContain("all_bow_accents");
-    expect(picks[0]).toBe("all_wavy_bob_bangs");
+  it("offers blondes to a blonde, never the color they already have", () => {
+    const blonde = buildColorProfile({ skin: "#f3d9d3", hair: "#b8a080", eye: "#6a8090" });
+    const picks = hairColorsFor(blonde);
+    expect(picks.map((c) => c.params.shade)).toEqual(expect.arrayContaining(["platinum", "dark_ash_blonde"]));
+    expect(picks.every((c) => deltaE(hexToLab(c.hex), blonde.hair!) >= 8)).toBe(true);
   });
 
-  it("never suggests a template that recolors the hair", () => {
-    const real: HairTemplate[] = [
-      { id: "all_steel_blonde_bob", title: "Steel Blonde Bob", thumb: null, category: "Female", changesColor: true },
-      { id: "all_bobcut", title: "Bobcut", thumb: null, category: "Female", changesColor: false },
-      { id: "female_long_straight", title: "Long Straight", thumb: null, category: "Female", changesColor: false },
-    ];
-    const picks = suggestHairstyles(real, "heart", "feminine").map((p) => p.templateId);
-    expect(picks).toEqual(["all_bobcut", "female_long_straight"]);
-    expect(templatesFor(real, "feminine")).toHaveLength(3);
-  });
-
-  it("says whether any chosen cut flatters the face, with its reasons", () => {
-    const cut = (title: string) => ({ title, category: "Female" });
-    expect(judgeHairstyle(cut("Wavy Bob With Bangs"), "oblong")).toMatchObject({
-      verdict: "flatters",
-      evidence: [
-        { code: "oblong_fringe", polarity: "plus" },
-        { code: "oblong_width", polarity: "plus" },
-      ],
-    });
-    expect(judgeHairstyle(cut("Long Straight"), "oblong")).toMatchObject({
-      verdict: "not_flattering",
-      evidence: [{ code: "oblong_long_straight", polarity: "minus" }],
-    });
-    // Ahead on balance but with a catch: it works, with tweaks.
-    expect(judgeHairstyle(cut("Long Straight Fringe"), "oblong").verdict).toBe("works_with_tweaks");
-    expect(judgeHairstyle(cut("Pixie"), "round")).toMatchObject({
-      verdict: "works_with_tweaks",
-      evidence: [{ code: "shape_no_effect", polarity: "neutral", params: { shape: "round" } }],
-    });
-  });
-
-  it("still suggests something without a face shape", () => {
-    const picks = suggestHairstyles(catalog, null, "feminine");
+  it("aims by the skin's depth when the hair could not be read", () => {
+    const picks = shades({ skin: "#8d5a3e" });
     expect(picks).toHaveLength(3);
-    expect(picks[0].code).toBe("no_shape");
+    expect(picks.every((c) => hexToLab(c.hex).L < 40)).toBe(true);
+  });
+
+  it("names every shade in both languages and builds params YouCam accepts", () => {
+    for (const skin of ["#d9a98a", "#f1d3cf", "#e8c4a8", "#8d5a3e"]) {
+      for (const c of shades({ skin, hair: "#5a4030" })) {
+        expect(hasKey("es", `shades.${c.params.shade}`) && hasKey("en", `shades.${c.params.shade}`)).toBe(true);
+        expect(hasKey("es", `beauty.hairWhy.${c.code}`) && hasKey("en", `beauty.hairWhy.${c.code}`)).toBe(true);
+        expect(PARAM_SCHEMAS["hair-color"].safeParse(hairColorParams(c.hex)).success).toBe(true);
+      }
+    }
   });
 });

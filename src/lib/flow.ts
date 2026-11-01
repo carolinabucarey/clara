@@ -7,14 +7,13 @@ import { buildColorProfile } from "./color/profile";
 import { DEFAULT_ATTRIBUTES } from "./garment/defaults";
 import { dominantColors, looksMulticolor } from "./color/dominant";
 import { flattenOnto, recolorPixels } from "./color/recolor";
-import { hairColorChanged, hairStats, transferHairColor } from "./color/hair";
 import { describeGarmentColor } from "./color/garment";
 import { canvasToBlob, faceCrop, getPixels, loadImage, prepareUpload, toCanvas, type Rect } from "./image";
 import { measureBody, PoseMeasurementError, LM, type Landmark } from "./pose/measure";
-import { detectFaces, detectPose, segmentHair } from "./pose/vision";
+import { detectFaces, detectPose } from "./pose/vision";
 import { fidelityIssues, meanDeltaE, type FidelityIssue } from "./pose/fidelity";
 import { readFaceShape, readSkinTone, runYouCam, YouCamTaskError } from "./youcam/browser";
-import { FACE_ATTRIBUTES, FEATURES, lipstickEffect, type MakeupEffect } from "./youcam/features";
+import { FACE_ATTRIBUTES, FEATURES, hairColorParams, lipstickEffect, type MakeupEffect } from "./youcam/features";
 import { errorKey } from "./youcam/errors";
 import type { Locale } from "./i18n";
 import type {
@@ -157,7 +156,7 @@ export interface SelfieAnalysis {
   profile: ColorProfile;
   selfieBlob: Blob;
   selfieUrl: string;
-  /** Head and shoulders, JPEG ≤ 1024 px: the framing YouCam's hairstyle try-on asks for. */
+  /** Head and shoulders, JPEG ≤ 1024 px, for the hair color and makeup try-ons. */
   selfieWideBlob: Blob;
   selfieWideUrl: string;
   /** null when YouCam couldn't read the face shape; the person can still choose it. */
@@ -198,7 +197,7 @@ export async function analyzeSelfie(file: Blob): Promise<SelfieAnalysis> {
 
   const [res, faceShape] = await Promise.all([
     runYouCam(FEATURES.skinTone, { src: prepared.blob, params: { face_angle_strictness_level: "medium" } }),
-    // The face shape only feeds hairstyle advice: never block the profile on it.
+    // The face shape only places the blush: never block the profile on it.
     analyzeFaceShape(prepared.blob).catch((e) => {
       console.warn("face shape analysis failed", e);
       return null;
@@ -288,44 +287,14 @@ export async function tryOnOutfit(
   return url;
 }
 
-/**
- * Hairstyle try-on on a head-and-shoulders photo, keeping the person's own hair color.
- * YouCam's "src" color is its own reading of the photo and can be far off (dark hair
- * coming back platinum), so unless the template brings its own color on purpose, the
- * hair is measured before and after and the original color is put back if it moved.
- */
-export async function applyHairstyle(src: Blob, templateId: string, keepColor = true) {
-  const res = await runYouCam(FEATURES.hairTransfer, { src, params: { template_id: templateId, hair_color: "src" } });
+/** Dyes the hair in a head-and-shoulders photo; the cut and everything else stay as they are. */
+export async function applyHairColor(src: Blob, hex: string) {
+  const res = await runYouCam(FEATURES.hairColor, { src, params: hairColorParams(hex) });
   if (!res.imageUrl) throw new FlowError("generic");
-  if (!keepColor) return res.imageUrl;
-  const restored = await restoreHairColor(src, res.imageUrl).catch((e) => {
-    console.warn("hair color check failed", e);
-    return null;
-  });
-  return restored ?? res.imageUrl;
+  return res.imageUrl;
 }
 
-/** The try-on with the person's hair color put back, or null when it kept it (local, no API cost). */
-async function restoreHairColor(src: Blob, resultUrl: string): Promise<string | null> {
-  const [before, after] = await Promise.all([loadImage(src), loadImage(resultUrl)]);
-  const a = toCanvas(before, 1024);
-  const b = toCanvas(after, 1024);
-  const maskA = await segmentHair(a);
-  const maskB = await segmentHair(b);
-  if (!maskA || !maskB) return null;
-  const pa = getPixels(a);
-  const pb = getPixels(b);
-  const own = hairStats(pa.data, a.width, a.height, maskA);
-  const now = hairStats(pb.data, b.width, b.height, maskB);
-  if (!own || !now || !hairColorChanged(own, now)) return null;
-  // The wrong color is often a near-white that the first read half misses.
-  const all = (await segmentHair(b, { lightHair: true })) ?? maskB;
-  transferHairColor(pb.data, b.width, b.height, all, hairStats(pb.data, b.width, b.height, all) ?? now, own);
-  b.getContext("2d")!.putImageData(pb, 0, 0);
-  return URL.createObjectURL(await canvasToBlob(b, "image/jpeg", 0.92));
-}
-
-/** The suggested makeup, on the hairstyle result when there is one, otherwise on the selfie. */
+/** The suggested makeup, on the hair color result when there is one, otherwise on the selfie. */
 export async function applyMakeupLook(effects: MakeupEffect[], baseUrl: string | null, selfieWide: Blob) {
   const src = baseUrl ? (await prepareUpload(await loadImage(baseUrl), 1600)).blob : selfieWide;
   const res = await runYouCam(FEATURES.makeup, { src, params: { effects, version: "1.0" } });
@@ -350,10 +319,13 @@ async function headBox(canvas: HTMLCanvasElement): Promise<Rect | null> {
   return { x: (Math.max(...xs) + Math.min(...xs)) / 2 - width / 2, y: nose.y * canvas.height - height * 0.55, width, height };
 }
 
-/** Head and shoulders with room around them, so the edges fade back to the photo well away from the face. */
-function lookCrop(face: Rect, imgW: number, imgH: number): Rect {
+/**
+ * Head and shoulders with room around them, so the edges fade back to the photo well away
+ * from the face. `tall` reaches further down, for long hair.
+ */
+function lookCrop(face: Rect, imgW: number, imgH: number, tall = 1.6): Rect {
   const width = Math.min(imgW, face.width * 3.6);
-  const height = Math.min(imgH, width * 1.6);
+  const height = Math.min(imgH, width * tall);
   const x = Math.max(0, Math.min(imgW - width, face.x + face.width / 2 - width / 2));
   const y = Math.max(0, Math.min(imgH - height, face.y - face.height * 0.9));
   return { x, y, width, height };
@@ -397,22 +369,23 @@ function pasteFeathered(target: HTMLCanvasElement, patch: HTMLImageElement, r: R
 }
 
 /**
- * The makeup on the outfit photo: the face in a full-body photo is too small for
- * YouCam's makeup try-on, so the head and shoulders are cropped, enlarged, made up,
- * and pasted back. The haircut stays on the selfie portrait: pasted into a full-body
- * photo it never blended in.
+ * The hair color and makeup on the outfit photo: the face in a full-body photo is too
+ * small for YouCam, so the head and shoulders are cropped, enlarged, edited and pasted
+ * back. The hair gets a taller crop than the makeup, so long hair is dyed to its ends.
  */
-export async function applyLookOnBody(outfitUrl: string, effects: MakeupEffect[]) {
+export async function applyLookOnBody(outfitUrl: string, effects: MakeupEffect[], hairHex: string | null) {
   const img = await loadImage(outfitUrl).catch(() => {
     throw new FlowError("baseExpired");
   });
   const full = toCanvas(img, 2400);
   const head = await headBox(full);
   if (!head) throw new FlowError("no_face_local");
-  const rect = lookCrop(head, full.width, full.height);
-  const crop = await canvasToBlob(cropScaled(full, rect, 1024));
-  const url = await applyMakeupLook(effects, null, crop);
-  pasteFeathered(full, await loadImage(url), rect);
+  const edit = async (rect: Rect, run: (crop: Blob) => Promise<string>) => {
+    const crop = await canvasToBlob(cropScaled(full, rect, 1024));
+    pasteFeathered(full, await loadImage(await run(crop)), rect);
+  };
+  if (hairHex) await edit(lookCrop(head, full.width, full.height, 2.2), (crop) => applyHairColor(crop, hairHex));
+  if (effects.length > 0) await edit(lookCrop(head, full.width, full.height), (crop) => applyMakeupLook(effects, null, crop));
   return URL.createObjectURL(await canvasToBlob(full));
 }
 

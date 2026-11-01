@@ -2,46 +2,46 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
-import { applyHairstyle, applyLookOnBody, applyMakeupLook, errorCode } from "@/lib/flow";
-import { makeupEffects, makeupFor } from "@/lib/beauty/makeup";
-import { judgeHairstyle, suggestHairstyles, templatesFor } from "@/lib/beauty/hairstyles";
-import { useHairTemplates } from "@/lib/beauty/templates";
-import type { BeautyPrefs, HairStyleGroup } from "@/lib/types";
+import { applyHairColor, applyLookOnBody, applyMakeupLook, errorCode } from "@/lib/flow";
+import { makeupEffects, makeupFor, makeupShades, shadeOf } from "@/lib/beauty/makeup";
+import { hairColorsFor } from "@/lib/beauty/haircolor";
+import type { BeautyPrefs, MakeupCategory } from "@/lib/types";
 import type { Look, Me } from "../ClaraApp";
-import { Button, Card, ChipSelect, cx, ErrorNote, EvidenceList, Note, SkeletonImage, Spinner, VerdictPill } from "../ui";
+import { Button, Card, cx, ErrorNote, Note, ShadePicker, SkeletonImage } from "../ui";
 import { ZoomableImage } from "../ZoomableImage";
 
-function HairTile({
+/** A hair color to pick: the dye as a round swatch, or the person's own hair in the selfie. */
+function HairColorTile({
   label,
-  note,
-  thumb,
+  hex,
+  photo,
   selected,
   onClick,
 }: {
   label: string;
-  note?: string;
-  thumb: string | null;
+  hex?: string;
+  photo?: string;
   selected: boolean;
   onClick: () => void;
 }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={selected} className="text-left">
+    <button type="button" onClick={onClick} aria-pressed={selected} className="flex w-16 flex-col items-center gap-1.5">
       <span
         className={cx(
-          "block aspect-square w-full overflow-hidden rounded-2xl bg-cream",
-          selected ? "ring-2 ring-ink ring-offset-2" : "border border-line",
+          "block h-14 w-14 overflow-hidden rounded-full bg-cream",
+          selected ? "ring-2 ring-ink ring-offset-2" : "border border-black/10",
         )}
+        style={hex ? { background: hex } : undefined}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        {thumb && <img src={thumb} alt="" className="h-full w-full object-cover" />}
+        {photo && <img src={photo} alt="" className="h-full w-full object-cover" />}
       </span>
-      <span className="mt-1 block truncate text-xs text-ink">{label}</span>
-      {note && <span className="block truncate text-[11px] text-muted">{note}</span>}
+      <span className="w-full text-center text-xs leading-tight text-ink">{label}</span>
     </button>
   );
 }
 
-/** Hair and makeup that finish the look: Clara's picks, why, and a before/after portrait. */
+/** Hair color and makeup that finish the look: Clara's picks, why, and a before/after portrait. */
 export function BeautySection({
   me,
   look,
@@ -65,62 +65,47 @@ export function BeautySection({
   onShown?: (shown: { faceUrl?: string; fullUrl?: string }) => void;
 }) {
   const { t, tl } = useI18n();
-  const { templates, failed } = useHairTemplates();
-  const [showAll, setShowAll] = useState(false);
   const [busy, setBusy] = useState(false);
   const [fullBusy, setFullBusy] = useState(false);
   const faceShape = me.faceShape?.shape ?? null;
 
-  const suggestions = useMemo(
-    () => (templates ? suggestHairstyles(templates, faceShape, beauty.hair) : []),
-    [templates, faceShape, beauty.hair],
-  );
-  const catalog = useMemo(() => (templates ? templatesFor(templates, beauty.hair) : []), [templates, beauty.hair]);
-  const chosen = look.hairTemplateId === undefined ? (suggestions[0]?.templateId ?? null) : look.hairTemplateId;
-  const chosenSuggestion = suggestions.find((s) => s.templateId === chosen);
-  const chosenTemplate = templates?.find((x) => x.id === chosen);
-  const hairFit = chosenTemplate && faceShape ? judgeHairstyle(chosenTemplate, faceShape) : null;
-  const titleOf = (id: string) => templates?.find((x) => x.id === id)?.title ?? "";
+  const hairColors = useMemo(() => hairColorsFor(me.profile), [me.profile]);
+  const hair = hairColors.find((c) => c.hex === look.hairColor) ?? null;
 
+  const shades = useMemo(() => makeupShades(me.profile), [me.profile]);
   const steps = useMemo(
-    () => (beauty.makeup ? makeupFor(me.profile, faceShape, outfitHexes) : []),
-    [beauty.makeup, me.profile, faceShape, outfitHexes],
+    () => (beauty.makeup ? makeupFor(me.profile, faceShape, outfitHexes, look.makeupShades) : []),
+    [beauty.makeup, me.profile, faceShape, outfitHexes, look.makeupShades],
   );
   const kept = steps.filter((s) => !look.makeupOff?.includes(s.category));
   const effects = makeupEffects(kept);
 
-  // Your own hair color, unless the cut you picked brings its own on purpose.
-  const ownColor = !chosenTemplate?.changesColor;
-  const hairSpec = chosen ? `${chosen}|${ownColor ? "own-color" : "template-color"}` : "";
-  const hairKey = chosen ? `${me.selfieWideUrl}|${hairSpec}` : null;
-  const faceKey = `${me.selfieWideUrl}|${hairSpec}|${JSON.stringify(effects)}`;
+  const hairKey = hair ? `${me.selfieWideUrl}|${hair.hex}` : null;
+  const lookSpec = `${hair?.hex ?? ""}|${JSON.stringify(effects)}`;
+  const faceKey = `${me.selfieWideUrl}|${lookSpec}`;
   const faceUrl = look.faceKey === faceKey ? look.faceUrl : undefined;
   const faceError = look.faceKey === faceKey ? look.faceError : undefined;
   const stale = !!look.faceUrl && look.faceKey !== faceKey;
-  const canTry = !!chosen || effects.length > 0;
-  // The full-body photo only gets the makeup: the haircut stays on the portrait.
-  const fullKey = outfitUrl && effects.length > 0 ? `${outfitUrl}|${JSON.stringify(effects)}` : null;
+  const canTry = !!hair || effects.length > 0;
+  const fullKey = outfitUrl && canTry ? `${outfitUrl}|${lookSpec}` : null;
   const fullUrl = fullKey && look.fullKey === fullKey ? look.fullUrl : undefined;
   const fullError = fullKey && look.fullKey === fullKey ? look.fullError : undefined;
   useEffect(() => {
     onShown?.({ faceUrl, fullUrl });
   }, [onShown, faceUrl, fullUrl]);
-  const used = () => ({
-    faceMakeup: kept,
-    faceHair: chosen ? { templateId: chosen, title: titleOf(chosen), code: chosenSuggestion?.code, params: chosenSuggestion?.params } : null,
-  });
+  const used = { faceMakeup: kept, faceHairColor: hair };
 
   const run = async () => {
     setBusy(true);
     onUpdateLook({ faceUrl: undefined, faceError: undefined, faceKey });
     try {
       let hairUrl = hairKey && look.hairKey === hairKey ? look.hairUrl : undefined;
-      if (chosen && !hairUrl) {
-        hairUrl = await applyHairstyle(me.selfieWideBlob, chosen, ownColor);
+      if (hair && !hairUrl) {
+        hairUrl = await applyHairColor(me.selfieWideBlob, hair.hex);
         onUpdateLook({ hairUrl, hairKey: hairKey! });
       }
-      const url = effects.length > 0 ? await applyMakeupLook(effects, chosen ? hairUrl! : null, me.selfieWideBlob) : hairUrl!;
-      onUpdateLook({ faceUrl: url, faceKey, ...used() });
+      const url = effects.length > 0 ? await applyMakeupLook(effects, hair ? hairUrl! : null, me.selfieWideBlob) : hairUrl!;
+      onUpdateLook({ faceUrl: url, faceKey, ...used });
     } catch (e) {
       onUpdateLook({ faceError: errorCode(e), faceKey });
     } finally {
@@ -133,8 +118,8 @@ export function BeautySection({
     setFullBusy(true);
     onUpdateLook({ fullUrl: undefined, fullError: undefined, fullKey });
     try {
-      const url = await applyLookOnBody(outfitUrl, effects);
-      onUpdateLook({ fullUrl: url, fullKey, faceMakeup: kept });
+      const url = await applyLookOnBody(outfitUrl, effects, hair?.hex ?? null);
+      onUpdateLook({ fullUrl: url, fullKey, ...used });
     } catch (e) {
       onUpdateLook({ fullError: errorCode(e), fullKey });
     } finally {
@@ -142,10 +127,19 @@ export function BeautySection({
     }
   };
 
-  const toggleStep = (category: (typeof steps)[number]["category"]) => {
+  const toggleStep = (category: MakeupCategory) => {
     const off = look.makeupOff ?? [];
     onUpdateLook({ makeupOff: off.includes(category) ? off.filter((c) => c !== category) : [...off, category] });
   };
+
+  /** Picking a shade also puts the step back in the look. */
+  const pickShade = (category: MakeupCategory, name: string) => {
+    const picked = { ...look.makeupShades };
+    if (name === shades[category][0].name) delete picked[category];
+    else picked[category] = name;
+    onUpdateLook({ makeupShades: picked, makeupOff: look.makeupOff?.filter((c) => c !== category) });
+  };
+  const shadeLabel = (category: MakeupCategory, name: string) => t(category === "lip_color" ? `lipsticks.${name}` : `shades.${name}`);
 
   return (
     <Card className="space-y-5">
@@ -154,82 +148,31 @@ export function BeautySection({
         <p className="text-sm text-muted">{t("beauty.subtitle")}</p>
       </div>
 
-      {/* Hair */}
+      {/* Hair color */}
       <div className="space-y-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
           <h3 className="text-sm font-semibold text-ink">{t("beauty.hairTitle")}</h3>
-          {faceShape && (
-            <span className="text-xs text-muted">
-              {t("beauty.faceShape")}: {t(`faceShapes.${faceShape}`)}
-            </span>
-          )}
+          <p className="text-xs text-muted">{t("beauty.hairNote")}</p>
         </div>
-        <ChipSelect<HairStyleGroup>
-          label={t("beauty.hairQuestion")}
-          value={beauty.hair}
-          options={(["feminine", "masculine", "all"] as const).map((v) => ({ value: v, label: t(`beauty.hairGroups.${v}`) }))}
-          onChange={(hair) => {
-            onBeauty({ ...beauty, hair });
-            onUpdateLook({ hairTemplateId: undefined });
-          }}
-        />
-        {!templates && !failed && <Spinner label={t("beauty.hairLoading")} />}
-        {failed && <Note>{t("beauty.hairUnavailable")}</Note>}
-        {templates && (
-          <>
-            <div className="grid grid-cols-4 gap-3">
-              <HairTile
-                label={t("beauty.keepHair")}
-                thumb={me.selfieWideUrl}
-                selected={chosen === null}
-                onClick={() => onUpdateLook({ hairTemplateId: null })}
-              />
-              {suggestions.map((s) => (
-                <HairTile
-                  key={s.templateId}
-                  label={s.title}
-                  thumb={s.thumb}
-                  selected={chosen === s.templateId}
-                  onClick={() => onUpdateLook({ hairTemplateId: s.templateId })}
-                />
-              ))}
-            </div>
-            {chosenTemplate && (
-              <div className="space-y-2 rounded-2xl bg-cream px-4 py-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-semibold text-ink">{chosenTemplate.title}</span>
-                  {hairFit && <VerdictPill verdict={hairFit.verdict} size="sm" />}
-                </div>
-                {hairFit ? (
-                  <EvidenceList items={hairFit.evidence} render={(e) => tl(`beauty.hairWhy.${e.code}`, e.params)} />
-                ) : (
-                  <p className="text-sm text-muted">{t("beauty.fitNoShape")}</p>
-                )}
-                {chosenTemplate.changesColor && <p className="text-xs text-muted">{t("beauty.colorNote")}</p>}
-              </div>
-            )}
-            {catalog.length > suggestions.length && (
-              <button className="text-sm font-semibold text-clay underline-offset-4 hover:underline" onClick={() => setShowAll((v) => !v)}>
-                {showAll ? t("beauty.lessHair") : t("beauty.moreHair")}
-              </button>
-            )}
-            {showAll && (
-              <div className="grid max-h-80 grid-cols-4 gap-3 overflow-y-auto pr-1 sm:grid-cols-5">
-                {catalog
-                  .filter((c) => !suggestions.some((s) => s.templateId === c.id))
-                  .map((c) => (
-                    <HairTile
-                      key={c.id}
-                      label={c.title}
-                      note={c.changesColor ? t("beauty.changesColor") : undefined}
-                      thumb={c.thumb}
-                      selected={chosen === c.id}
-                      onClick={() => onUpdateLook({ hairTemplateId: c.id })}
-                    />
-                  ))}
-              </div>
-            )}
-          </>
+        <div className="flex flex-wrap gap-3">
+          <HairColorTile
+            label={t("beauty.ownHair")}
+            photo={me.selfieWideUrl}
+            selected={!hair}
+            onClick={() => onUpdateLook({ hairColor: undefined })}
+          />
+          {hairColors.map((c) => (
+            <HairColorTile
+              key={c.hex}
+              label={t(`shades.${c.params.shade}`)}
+              hex={c.hex}
+              selected={hair?.hex === c.hex}
+              onClick={() => onUpdateLook({ hairColor: c.hex })}
+            />
+          ))}
+        </div>
+        {hair && (
+          <p className="rounded-2xl bg-cream px-4 py-3 text-sm leading-relaxed text-ink">{tl(`beauty.hairWhy.${hair.code}`, hair.params)}</p>
         )}
       </div>
 
@@ -264,9 +207,17 @@ export function BeautySection({
                       <span key={c} className="block h-6 w-6 rounded-full border border-black/10" style={{ background: c }} aria-hidden />
                     ))}
                   </span>
-                  <div className={cx("flex-1", !on && "opacity-50")}>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">{t(`beauty.categories.${s.category}`)}</p>
-                    <p className="text-sm leading-relaxed text-ink">{tl(`beauty.why.${s.code}`, s.params)}</p>
+                  <div className={cx("min-w-0 flex-1 space-y-2.5", !on && "opacity-50")}>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted">{t(`beauty.categories.${s.category}`)}</p>
+                      <p className="text-sm leading-relaxed text-ink">{tl(`beauty.why.${s.code}`, s.params)}</p>
+                    </div>
+                    <ShadePicker
+                      shades={shades[s.category]}
+                      value={shadeOf(s)}
+                      onChange={(name) => pickShade(s.category, name)}
+                      label={(name) => shadeLabel(s.category, name)}
+                    />
                   </div>
                   <input
                     type="checkbox"

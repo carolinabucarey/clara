@@ -48,6 +48,20 @@ export function lipstickFor(profile: Pick<ColorProfile, "undertone" | "depth">) 
   return LIPSTICKS[profile.undertone][profile.depth];
 }
 
+const UNDERTONES: Undertone[] = ["warm", "cool", "neutral"];
+
+/** Every shade of a table: the person's first, then the rest of their undertone, then the others. */
+export function ownFirst<S>(table: Record<Undertone, Record<Depth, S>>, profile: Pick<ColorProfile, "undertone" | "depth">): S[] {
+  const own = table[profile.undertone][profile.depth];
+  const order = [profile.undertone, ...UNDERTONES.filter((u) => u !== profile.undertone)];
+  return [own, ...order.flatMap((u) => Object.values(table[u])).filter((s) => s !== own)];
+}
+
+/** Lipsticks to try: the person's palette shade first, then the others. */
+export function lipsticksFor(profile: Pick<ColorProfile, "undertone" | "depth">) {
+  return ownFirst(LIPSTICKS, profile);
+}
+
 /** Palette color closest in hue to the garment: "the same piece, in your color". */
 export function closestPaletteColor(palette: string[], garmentHex: string): string | null {
   const g = hexToLch(garmentHex);

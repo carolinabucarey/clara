@@ -245,6 +245,57 @@ export function Swatch({ hex, label, size = 36, selected, onClick }: {
   );
 }
 
+/** Makeup shades to pick from: the palette's own first, set apart, then others to try. */
+export function ShadePicker({
+  shades,
+  value,
+  onChange,
+  label,
+  disabled,
+}: {
+  /** Palette shade first; a shade with two colors (eyes) shows both halves. */
+  shades: Array<{ name: string; colors: string[] }>;
+  value: string;
+  onChange: (name: string) => void;
+  /** The shade's name as people read it. */
+  label: (name: string) => string;
+  disabled?: boolean;
+}) {
+  const { t } = useI18n();
+  const dot = (s: { name: string; colors: string[] }) => (
+    <button
+      key={s.name}
+      type="button"
+      onClick={() => onChange(s.name)}
+      disabled={disabled}
+      aria-pressed={s.name === value}
+      aria-label={label(s.name)}
+      title={label(s.name)}
+      className={cx(
+        "block h-8 w-8 shrink-0 rounded-full disabled:cursor-not-allowed disabled:opacity-60",
+        s.name === value ? "ring-2 ring-ink ring-offset-2" : "border border-black/10",
+      )}
+      style={{ background: s.colors.length > 1 ? `linear-gradient(135deg, ${s.colors[0]} 50%, ${s.colors[1]} 50%)` : s.colors[0] }}
+    />
+  );
+  const [own, ...others] = shades;
+  if (!own) return null;
+  return (
+    <div className="flex items-start gap-3">
+      <div className="flex shrink-0 flex-col items-center gap-1">
+        {dot(own)}
+        <span className="text-[11px] leading-tight text-muted">{t("shadePicker.palette")}</span>
+      </div>
+      {others.length > 0 && (
+        <div className="min-w-0 space-y-1 border-l border-line pl-3">
+          <div className="flex flex-wrap gap-2">{others.map(dot)}</div>
+          <span className="block text-[11px] leading-tight text-muted">{t("shadePicker.others")}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** A row of mutually exclusive chips, used for every user correction. */
 export function ChipSelect<T extends string>({
   label,

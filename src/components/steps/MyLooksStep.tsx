@@ -90,15 +90,15 @@ function LookDetail({ look, urls }: { look: SavedLook; urls: Record<string, stri
           <EvidenceList items={look.outfit.evidence} render={(e) => ev(e.code, e.params)} />
         </div>
       )}
-      {look.hairstyle && (
-        <p className="text-sm text-ink">
-          <span className="font-semibold">{look.hairstyle.title}</span>
-          {look.hairstyle.code && <> · {tl(`beauty.hairWhy.${look.hairstyle.code}`, look.hairstyle.params)}</>}
-        </p>
-      )}
-      {look.makeup && look.makeup.length > 0 && (
+      {(look.hairColor || (look.makeup && look.makeup.length > 0)) && (
         <ul className="space-y-1.5">
-          {look.makeup.map((s) => (
+          {look.hairColor && (
+            <li className="flex items-start gap-2 text-sm text-ink/85">
+              <span className="mt-0.5 block h-4 w-4 shrink-0 rounded-full border border-black/10" style={{ background: look.hairColor.hex }} aria-hidden />
+              {tl(`beauty.hairWhy.${look.hairColor.code}`, look.hairColor.params)}
+            </li>
+          )}
+          {look.makeup?.map((s) => (
             <li key={s.category} className="flex items-start gap-2 text-sm text-ink/85">
               <span className="mt-0.5 flex shrink-0 gap-1">
                 {s.colors.map((c) => (

@@ -22,7 +22,7 @@ interface ProfileRow {
   body_path: string;
 }
 
-export const DEFAULT_BEAUTY: BeautyPrefs = { makeup: null, hair: "all" };
+export const DEFAULT_BEAUTY: BeautyPrefs = { makeup: null };
 
 /** Saves the measurements; the photos too when they changed since the last save. */
 export async function saveProfile(me: Me, prefs: { beauty: BeautyPrefs; goals: Goal[] }, withPhotos: boolean) {
@@ -82,7 +82,7 @@ export async function loadProfile(): Promise<{ me: Me; beauty: BeautyPrefs; goal
       measuredProportions: data.measured_proportions,
       faceShape: data.face_shape,
     },
-    beauty: { ...DEFAULT_BEAUTY, ...data.beauty_prefs },
+    beauty: { makeup: data.beauty_prefs?.makeup ?? DEFAULT_BEAUTY.makeup },
     goals: Array.isArray(data.goals) ? data.goals : [],
   };
 }

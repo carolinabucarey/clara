@@ -1,12 +1,13 @@
 // Suggested makeup: shades from the measured undertone, depth and contrast, placement
 // from the face shape, and a nod to the outfit's color. Pure, so it is tested and can
 // be explained step by step ("your undertone is warm (63°), so a peach blush").
+// Each step can swap Clara's shade for another one the person wants to try.
 
 import { hexToLch } from "../color/lab";
 import { describeGarmentColor } from "../color/garment";
-import { lipstickFor } from "../verdict/palette";
+import { lipsticksFor, ownFirst } from "../verdict/palette";
 import type { MakeupEffect } from "../youcam/features";
-import type { ColorProfile, Contrast, Depth, FaceShape, MakeupStep, Undertone } from "../types";
+import type { ColorProfile, Contrast, Depth, FaceShape, MakeupCategory, MakeupStep, Undertone } from "../types";
 
 const BLUSH: Record<Undertone, Record<Depth, { hex: string; name: string }>> = {
   warm: { light: { hex: "#f0a080", name: "peach" }, medium: { hex: "#d9785a", name: "apricot" }, deep: { hex: "#b4553a", name: "terracotta" } },
@@ -27,6 +28,17 @@ const LINER: Record<Contrast, { hex: string; name: string; intensity: number }> 
   low: { hex: "#5a4030", name: "soft_brown", intensity: 40 },
 };
 
+/** Eye shades outside any undertone, only offered to try. */
+const EXTRA_SHADOWS: Array<{ colors: [string, string]; name: string }> = [
+  { colors: ["#b0aeb0", "#3c3a3e"], name: "smoky" },
+  { colors: ["#bf98ac", "#5e3050"], name: "plum" },
+  { colors: ["#bab27f", "#5b5a2e"], name: "olive" },
+];
+const EXTRA_LINERS: Array<{ hex: string; name: string }> = [
+  { hex: "#1f2a4a", name: "navy" },
+  { hex: "#4a2440", name: "plum" },
+];
+
 /** Blush placement from YouCam's catalog (patterns tagged by face shape). */
 const BLUSH_PATTERN: Partial<Record<FaceShape, string>> = {
   round: "1color2",
@@ -40,30 +52,64 @@ const SHADOW_PATTERN = "2colors1";
 const LINER_PATTERN = "Upper6";
 
 const BY_CONTRAST: Record<Contrast, number> = { low: 0, medium: 1, high: 2 };
+const UNDERTONES: Undertone[] = ["warm", "cool", "neutral"];
+const CONTRASTS: Contrast[] = ["high", "medium", "low"];
 
-export function makeupFor(profile: ColorProfile, faceShape: FaceShape | null, outfitHexes: string[] = []): MakeupStep[] {
+/** A shade to pick for one makeup step; `name` is an i18n key under `shades` (`lipsticks` for lips). */
+export interface MakeupShade {
+  name: string;
+  colors: string[];
+}
+
+/** The shade the person picked per step; a missing step keeps Clara's. */
+export type MakeupShades = Partial<Record<MakeupCategory, string>>;
+
+/** Shades to pick from for each step: Clara's for this coloring first, then others to try. */
+export function makeupShades(profile: ColorProfile): Record<MakeupCategory, MakeupShade[]> {
+  const shadows = [profile.undertone, ...UNDERTONES.filter((u) => u !== profile.undertone)].map((u) => SHADOW[u]);
+  const liners = [profile.contrast, ...CONTRASTS.filter((c) => c !== profile.contrast)].map((c) => LINER[c]);
+  return {
+    blush: ownFirst(BLUSH, profile).map((s) => ({ name: s.name, colors: [s.hex] })),
+    eye_shadow: [...shadows, ...EXTRA_SHADOWS].map((s) => ({ name: s.name, colors: s.colors })),
+    eye_liner: [...liners, ...EXTRA_LINERS].map((s) => ({ name: s.name, colors: [s.hex] })),
+    lip_color: lipsticksFor(profile).map((s) => ({ name: s.name, colors: [s.hex] })),
+  };
+}
+
+/** The shade a step was made with. */
+export const shadeOf = (step: MakeupStep) => String(step.params?.shade ?? step.params?.name ?? "");
+
+export function makeupFor(profile: ColorProfile, faceShape: FaceShape | null, outfitHexes: string[] = [], chosen: MakeupShades = {}): MakeupStep[] {
   const level = BY_CONTRAST[profile.contrast];
   const base = { undertone: profile.undertone, skinHue: Math.round(profile.skinHue), contrast: profile.contrast };
   const deltaL = profile.contrastDeltaL === null ? "?" : Math.round(profile.contrastDeltaL);
 
-  const blush = BLUSH[profile.undertone][profile.depth];
+  // Clara's shade unless the person picked another one to try.
+  const shades = makeupShades(profile);
+  const pick = (c: MakeupCategory) => {
+    const shade = shades[c].find((s) => s.name === chosen[c]) ?? shades[c][0];
+    return { ...shade, tried: shade !== shades[c][0] };
+  };
+
+  const blush = pick("blush");
+  const shaped = !!faceShape && !!BLUSH_PATTERN[faceShape];
   const blushPattern = (faceShape && BLUSH_PATTERN[faceShape]) || DEFAULT_BLUSH_PATTERN;
 
   // The outfit's main chromatic color stays the star; with neutral clothes the eyes can carry more depth.
   const main = outfitHexes.map((h) => ({ hex: h, ...hexToLch(h) })).find((c) => c.C >= 15);
-  const shadow = SHADOW[profile.undertone];
+  const shadow = pick("eye_shadow");
   const shadowIntensity = 30 + level * 10 + (main ? 0 : 10);
 
-  const liner = LINER[profile.contrast];
-  const lip = lipstickFor(profile);
+  const liner = pick("eye_liner");
+  const lip = pick("lip_color");
 
   return [
     {
       category: "blush",
-      colors: [blush.hex],
+      colors: blush.colors,
       intensity: 35 + level * 10,
       pattern: blushPattern,
-      code: faceShape && BLUSH_PATTERN[faceShape] ? "blush_shape" : "blush",
+      code: `${shaped ? "blush_shape" : "blush"}${blush.tried ? "_try" : ""}`,
       params: { ...base, shade: blush.name, ...(faceShape ? { shape: faceShape } : {}) },
     },
     {
@@ -71,22 +117,22 @@ export function makeupFor(profile: ColorProfile, faceShape: FaceShape | null, ou
       colors: shadow.colors,
       intensity: shadowIntensity,
       pattern: SHADOW_PATTERN,
-      code: main ? "eyes_let_color_lead" : "eyes_depth_with_neutrals",
+      code: shadow.tried ? "eyes_try" : main ? "eyes_let_color_lead" : "eyes_depth_with_neutrals",
       params: { ...base, shade: shadow.name, ...(main ? { color: describeGarmentColor(main.hex).name } : {}) },
     },
     {
       category: "eye_liner",
-      colors: [liner.hex],
-      intensity: liner.intensity,
+      colors: liner.colors,
+      intensity: LINER[profile.contrast].intensity,
       pattern: LINER_PATTERN,
-      code: `liner_${profile.contrast}`,
+      code: liner.tried ? "liner_try" : `liner_${profile.contrast}`,
       params: { ...base, shade: liner.name, deltaL },
     },
     {
       category: "lip_color",
-      colors: [lip.hex],
+      colors: lip.colors,
       intensity: 55 + level * 12,
-      code: "lip",
+      code: lip.tried ? "lip_try" : "lip",
       params: { ...base, name: lip.name },
     },
   ];

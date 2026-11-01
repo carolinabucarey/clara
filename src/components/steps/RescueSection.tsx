@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { applyLipstick, errorCode, tryOnBetterColor } from "@/lib/flow";
 import { renderBeforeAfterCard } from "@/lib/share";
+import { lipsticksFor } from "@/lib/verdict/palette";
 import type { RescueKind } from "@/lib/types";
 import type { Me, Trial } from "../ClaraApp";
-import { Button, Card, ErrorNote, Note, ShareButton, SkeletonImage, Swatch } from "../ui";
+import { Button, Card, ErrorNote, Note, ShadePicker, ShareButton, SkeletonImage, Swatch } from "../ui";
 import { ZoomableImage } from "../ZoomableImage";
 
 const ICONS: Record<RescueKind, string> = {
@@ -39,6 +40,9 @@ export function RescueSection({
   const result = trial.result!;
   const lip = result.rescues.find((r) => r.kind === "lipstick");
   const others = result.rescues.filter((r) => r.kind !== "lipstick");
+  // Clara's lipstick first, then the others the person may want to try.
+  const lipsticks = lip?.lipstick ? [lip.lipstick, ...lipsticksFor(me.profile).filter((s) => s.name !== lip.lipstick!.name)] : [];
+  const shown = lipsticks.find((s) => s.name === trial.lipShade) ?? lip?.lipstick;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
@@ -63,11 +67,11 @@ export function RescueSection({
   };
 
   const runLip = async () => {
-    if (!lip?.lipstick) return;
+    if (!shown) return;
     setBusy(true);
     setError(null);
     try {
-      const { url, beforeUrl } = await applyLipstick(lip.lipstick.hex, trial.tryOnUrl ?? null, me.selfieBlob);
+      const { url, beforeUrl } = await applyLipstick(shown.hex, trial.tryOnUrl ?? null, me.selfieBlob);
       onUpdate({ lipUrl: url, lipBeforeUrl: beforeUrl });
     } catch (e) {
       setError(t(`errors.${errorCode(e)}`));
@@ -83,13 +87,23 @@ export function RescueSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const lipName = lip?.lipstick ? t(`lipsticks.${lip.lipstick.name}`) : "";
+  const pickLip = (name: string) => {
+    if (name === shown?.name) return;
+    setError(null);
+    onUpdate({ lipShade: name === lip?.lipstick?.name ? undefined : name, lipUrl: undefined, lipBeforeUrl: undefined });
+  };
+
+  const lipName = shown ? t(`lipsticks.${shown.name}`) : "";
+  const lipText = () =>
+    shown === lip!.lipstick
+      ? rs("lipstick", { ...lip!.params, name: lip!.lipstick!.name })
+      : t("rescue.lipOther", { name: lipName, palette: t(`lipsticks.${lip!.lipstick!.name}`) });
 
   const shareLip = () =>
     renderBeforeAfterCard({
       before: { imageUrl: trial.lipBeforeUrl ?? me.selfieUrl, label: t("rescue.before") },
-      after: { imageUrl: trial.lipUrl!, label: t("rescue.after"), hex: lip!.lipstick!.hex },
-      text: rs("lipstick", { ...lip!.params, name: lip!.lipstick!.name }),
+      after: { imageUrl: trial.lipUrl!, label: t("rescue.after"), hex: shown!.hex },
+      text: lipText(),
       palette: result.palette,
       labels: { title: t("rescue.lipTitle", { name: lipName }), footer: t("privacy") },
     });
@@ -107,13 +121,20 @@ export function RescueSection({
     <div className="space-y-4">
       {result.rescues.length === 0 && <Note>{t("rescue.nothing")}</Note>}
 
-      {lip?.lipstick && (
+      {lip?.lipstick && shown && (
         <Card className="space-y-3">
           <div className="flex items-center gap-3">
-            <Swatch hex={lip.lipstick.hex} size={32} />
+            <Swatch hex={shown.hex} size={32} />
             <h2 className="font-display text-xl text-ink">{t("rescue.lipTitle", { name: lipName })}</h2>
           </div>
-          <p className="text-sm text-muted">{rs("lipstick", { ...lip.params, name: lip.lipstick.name })}</p>
+          <p className="text-sm text-muted">{lipText()}</p>
+          <ShadePicker
+            shades={lipsticks.map((s) => ({ name: s.name, colors: [s.hex] }))}
+            value={shown.name}
+            onChange={pickLip}
+            label={(name) => t(`lipsticks.${name}`)}
+            disabled={busy}
+          />
           <div className="grid grid-cols-2 gap-3">
             <figure>
               {/* eslint-disable-next-line @next/next/no-img-element */}
