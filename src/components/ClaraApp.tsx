@@ -7,7 +7,7 @@ import type { GarmentAnalysis } from "@/lib/flow";
 import { fullLookUrl, missingSlots, outfitKey, placePiece, removePiece, tryOnBaseFor, wearOrder } from "@/lib/look";
 import { deleteAccount, signOut, useAccount } from "@/lib/account/session";
 import { deleteAllData, hasProfile, loadProfile, saveProfile } from "@/lib/account/profile";
-import { openSavedLook, saveLook, type SavedHairstyle, type SavedLook } from "@/lib/account/looks";
+import { LOOK_NAME_MAX, openSavedLook, saveLook, type SavedHairstyle, type SavedLook } from "@/lib/account/looks";
 import { makeupEffects } from "@/lib/beauty/makeup";
 import { SaveError } from "@/lib/account/storage";
 import { evaluateOutfit } from "@/lib/verdict/outfit";
@@ -96,6 +96,8 @@ export interface Look {
   /** What the latest portrait or full look was made with, to save it alongside. */
   faceMakeup?: MakeupStep[];
   faceHair?: SavedHairstyle | null;
+  /** The name the person gives the look, saved with it. */
+  name?: string;
   /** The account copy this look updates when saved again. */
   saved?: SavedLook;
 }
@@ -250,6 +252,7 @@ export function ClaraApp() {
       const styled = !!(look.faceUrl || fullUrl);
       const saved = await saveLook(
         {
+          name: look.name ?? null,
           pieces: order.map((slot) => ({ slot, trial: pieceOf(slot) })),
           outfitUrl,
           outfit,
@@ -375,6 +378,7 @@ export function ClaraApp() {
         id: newId(),
         pieces,
         saved,
+        name: saved.name ?? undefined,
         outfitUrl: loaded.outfitUrl,
         outfitKey: loaded.outfitUrl ? outfitKey(pieces, all, me.bodyUrl) : undefined,
         hairTemplateId: styled ? templateId : undefined,
@@ -390,6 +394,16 @@ export function ClaraApp() {
     setCurrent(offset);
     setBack(null);
     setStep("look");
+  };
+
+  /** A look renamed in My looks: the session copy takes the new name, so saving it again keeps it. */
+  const renamedLook = (renamed: SavedLook) => {
+    const rename = (l: Look) => (l.saved?.id === renamed.id ? { ...l, saved: renamed, name: renamed.name ?? undefined } : l);
+    setLooks((ls) => ls.map(rename));
+    // Still "Saved" if it was: the account already has the new name.
+    if (!look) return;
+    const before = lookSignature(look, trials, me, goals, beauty);
+    setSave((s) => (s?.signature === before ? { ...s, signature: lookSignature(rename(look), trials, me, goals, beauty) } : s));
   };
 
   const onDeleteData = async () => {
@@ -421,6 +435,16 @@ export function ClaraApp() {
   const saveStatus = look && save?.signature === lookSignature(look, trials, me, goals, beauty) ? save.status : null;
   const saveActions = account.enabled && look && (
     <>
+      <label className="order-first flex basis-full justify-end">
+        <input
+          className="h-11 w-full rounded-xl border border-line bg-paper px-3 text-base text-ink focus:border-ink focus:outline-none sm:max-w-xs"
+          aria-label={t("look.name")}
+          placeholder={t("look.namePlaceholder")}
+          maxLength={LOOK_NAME_MAX}
+          value={look.name ?? ""}
+          onChange={(e) => updateLook({ name: e.target.value })}
+        />
+      </label>
       {account.user && !profileSync.saved && (
         <label className="flex basis-full items-start justify-end gap-2 text-right text-xs text-muted">
           <input
@@ -686,6 +710,7 @@ export function ClaraApp() {
             key={account.user.id}
             canEdit={!!me}
             onEdit={editSavedLook}
+            onRenamed={renamedLook}
             onBack={() => {
               if (back) {
                 setCurrent(back.current);
