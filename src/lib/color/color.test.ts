@@ -70,6 +70,17 @@ describe("garment color", () => {
     expect(name("#6f4e37")).toBe("brown");
     expect(name("#b03a2e")).toBe("red");
   });
+  it("names light muted reds pink, not cream or beige", () => {
+    const name = (hex: string) => {
+      const c = hexToLch(hex);
+      return colorName(c.L, c.C, c.h);
+    };
+    expect(name("#efceca")).toBe("pink");
+    expect(name("#f2d7d5")).toBe("pink");
+    expect(name("#f4c2c2")).toBe("pink");
+    expect(name("#a08680")).toBe("taupe");
+    expect(name("#f0d5c8")).toBe("cream");
+  });
   it("describes temperature, value and chroma", () => {
     const camel = describeGarmentColor("#c19a6b");
     expect(camel.temperature).toBe("warm");

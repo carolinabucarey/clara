@@ -4,6 +4,7 @@
 // copied to the person's folder (YouCam's own links expire within hours).
 
 import type { Trial } from "@/components/ClaraApp";
+import { describeGarmentColor } from "../color/garment";
 import { canvasToBlob, loadImage, toCanvas } from "../image";
 import { downloadImage, removeImages, SaveError, signedInClient, uploadImage } from "./storage";
 import type {
@@ -77,7 +78,8 @@ function fromRow(r: LookRow): SavedLook {
     id: r.id,
     createdAt: r.created_at,
     updatedAt: r.updated_at ?? null,
-    pieces: r.pieces ?? [],
+    // Re-describe the stored hex so saved looks pick up fixes to color naming.
+    pieces: (r.pieces ?? []).map((p) => ({ ...p, color: describeGarmentColor(p.color.hex, p.color.share) })),
     outfit: r.outfit_verdict,
     outfitPath: r.outfit_path,
     facePath: r.face_path,
