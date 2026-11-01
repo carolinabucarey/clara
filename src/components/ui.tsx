@@ -252,6 +252,7 @@ export function ShadePicker({
   onChange,
   label,
   disabled,
+  captions,
 }: {
   /** Palette shade first; a shade with two colors (eyes) shows both halves. */
   shades: Array<{ name: string; colors: string[] }>;
@@ -260,6 +261,8 @@ export function ShadePicker({
   /** The shade's name as people read it. */
   label: (name: string) => string;
   disabled?: boolean;
+  /** Text under the first shade and the others, when "your palette" / "others to try" doesn't fit. */
+  captions?: { own: string; others: string };
 }) {
   const { t } = useI18n();
   const dot = (s: { name: string; colors: string[] }) => (
@@ -284,12 +287,12 @@ export function ShadePicker({
     <div className="flex items-start gap-3">
       <div className="flex shrink-0 flex-col items-center gap-1">
         {dot(own)}
-        <span className="text-[11px] leading-tight text-muted">{t("shadePicker.palette")}</span>
+        <span className="text-[11px] leading-tight text-muted">{captions?.own ?? t("shadePicker.palette")}</span>
       </div>
       {others.length > 0 && (
         <div className="min-w-0 space-y-1 border-l border-line pl-3">
           <div className="flex flex-wrap gap-2">{others.map(dot)}</div>
-          <span className="block text-[11px] leading-tight text-muted">{t("shadePicker.others")}</span>
+          <span className="block text-[11px] leading-tight text-muted">{captions?.others ?? t("shadePicker.others")}</span>
         </div>
       )}
     </div>

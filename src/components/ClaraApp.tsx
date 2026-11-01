@@ -65,6 +65,8 @@ export interface Trial {
   lipShade?: string;
   lipUrl?: string;
   lipBeforeUrl?: string;
+  /** Palette color the person picked instead of Clara's `betterColor`. */
+  betterPick?: string;
   /** "Better version": the same garment recolored to the user's palette, tried on. */
   betterUrl?: string;
   betterGarmentUrl?: string;
@@ -113,7 +115,7 @@ const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 // Fields to clear when their inputs change.
 const STALE_BETTER: Partial<Trial> = { betterUrl: undefined, betterGarmentUrl: undefined, betterHex: undefined };
-const STALE_VERDICT: Partial<Trial> = { result: undefined, draft: undefined, draftInputKey: undefined, lipUrl: undefined, lipBeforeUrl: undefined, ...STALE_BETTER };
+const STALE_VERDICT: Partial<Trial> = { result: undefined, draft: undefined, draftInputKey: undefined, lipUrl: undefined, lipBeforeUrl: undefined, betterPick: undefined, ...STALE_BETTER };
 const STALE_TRY_ON: Partial<Trial> = {
   tryOnUrl: undefined,
   tryOnError: undefined,
