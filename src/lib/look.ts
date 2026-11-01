@@ -97,3 +97,14 @@ export function tryOnBaseFor(pieces: Pieces, trials: TryOnState[], index: number
   }
   return undefined;
 }
+
+/**
+ * Try-ons to swap one piece of a look for another version of it (the same piece in
+ * another color) over the look's image: the new version, then any layer worn over it,
+ * since YouCam replaces whatever shows in the piece's category, a jacket included.
+ * `all` is the look with the swap, in wear order, to start over from the body photo.
+ */
+export function swapSteps<T extends { category: GarmentCategory }>(pieces: T[], index: number, swapped: T): { over: T[]; all: T[] } {
+  const all = pieces.map((p, i) => (i === index ? swapped : p));
+  return { over: [swapped, ...all.slice(index + 1).filter((p) => p.category === "outer")], all };
+}

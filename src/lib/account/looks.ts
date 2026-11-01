@@ -27,8 +27,11 @@ export interface SavedPiece {
   draftLocale: string | null;
   garmentPath: string;
   tryOnPath: string | null;
-  /** The same piece recolored to the person's palette, tried on (RescueSection). */
-  better?: { hex: string; tryOnPath: string };
+  /**
+   * The same piece recolored to the person's palette, tried on (RescueSection). `withLook`:
+   * made over the look's own image, with its other pieces (older saves only have the piece).
+   */
+  better?: { hex: string; tryOnPath: string; withLook?: boolean };
   /** Store page the piece came from. */
   source?: { url: string; title: string | null };
 }
@@ -136,7 +139,9 @@ export async function saveLook(input: LookToSave, existing?: SavedLook | null): 
     const pieces: SavedPiece[] = [];
     for (const [i, { slot, trial }] of input.pieces.entries()) {
       const g = trial.garment;
-      const betterPath = trial.betterHex ? await upload(`piece-${i}-color`, trial.betterUrl).catch(() => null) : null;
+      // Only a recolor that still compares with the look being saved.
+      const betterCurrent = trial.betterHex && (trial.betterLookUrl ?? null) === input.outfitUrl;
+      const betterPath = betterCurrent ? await upload(`piece-${i}-color`, trial.betterUrl).catch(() => null) : null;
       pieces.push({
         slot,
         attrs: g.attrs,
@@ -146,7 +151,7 @@ export async function saveLook(input: LookToSave, existing?: SavedLook | null): 
         draftLocale: trial.draftLocale ?? null,
         garmentPath: (await upload(`piece-${i}`, g.isolatedUrl, g.upload))!,
         tryOnPath: await upload(`piece-${i}-on`, trial.tryOnUrl).catch(() => null),
-        ...(betterPath ? { better: { hex: trial.betterHex!, tryOnPath: betterPath } } : {}),
+        ...(betterPath ? { better: { hex: trial.betterHex!, tryOnPath: betterPath, withLook: true } } : {}),
         ...(g.source ? { source: g.source } : {}),
       });
     }
@@ -233,6 +238,8 @@ export async function openSavedLook(saved: SavedLook) {
     return urls.get(p);
   };
   const stamp = Date.now();
+  // The look image each recolor compares with: the outfit, or the only piece's try-on.
+  const lookShown = saved.pieces.length > 1 ? url(saved.outfitPath) : url(saved.pieces[0]?.tryOnPath ?? null);
   const trials: Trial[] = await Promise.all(
     saved.pieces.map(async (p, i) => {
       const garment = blobs[p.garmentPath];
@@ -254,6 +261,8 @@ export async function openSavedLook(saved: SavedLook) {
         tryOnUrl: url(p.tryOnPath),
         betterUrl: url(p.better?.tryOnPath ?? null),
         betterHex: p.better?.hex,
+        // Older saves of several pieces recolored the piece alone: offer to try it again on the look.
+        betterLookUrl: p.better?.withLook || saved.pieces.length === 1 ? lookShown : undefined,
         result: p.result ?? undefined,
         draft: p.draft ?? undefined,
         draftLocale: p.draftLocale ?? undefined,

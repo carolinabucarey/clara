@@ -15,6 +15,7 @@ import { fidelityIssues, meanDeltaE, type FidelityIssue } from "./pose/fidelity"
 import { readFaceShape, readSkinTone, runYouCam, YouCamTaskError } from "./youcam/browser";
 import { FACE_ATTRIBUTES, FEATURES, hairColorParams, lipstickEffect, type MakeupEffect } from "./youcam/features";
 import { errorKey } from "./youcam/errors";
+import { swapSteps } from "./look";
 import type { Locale } from "./i18n";
 import type {
   ColorProfile,
@@ -412,13 +413,25 @@ export async function checkTryOnFidelity(bodyUrl: string, tryOnUrl: string): Pro
   return fidelityIssues({ original, result, width: ca.width, faceDeltaE });
 }
 
+export interface OutfitStep {
+  garment: Blob;
+  category: GarmentCategory;
+}
+
 /**
  * "Better version": recolors the isolated garment (YouCam background removal) to a
- * color from the user's palette, then tries that version on with YouCam. Pass the image
- * the piece's own try-on was made over (another piece of its look) so the rest of the
- * outfit stays in the picture; the body photo is used when there is none or it expired.
+ * color from the user's palette, then tries that version on with YouCam over `baseUrl`,
+ * replacing the piece there. For a look of several pieces that is the image of the whole
+ * look, so the other pieces stay in the picture; a layer worn over the piece is put back
+ * on. `pieces` is every piece of the look in wear order (the piece itself at `index`):
+ * if the base has expired, the look is tried on again from the body photo.
  */
-export async function tryOnBetterColor(body: Blob, garment: GarmentAnalysis, targetHex: string, baseUrl?: string) {
+export async function tryOnBetterColor(
+  body: Blob,
+  garment: GarmentAnalysis,
+  targetHex: string,
+  look: { baseUrl: string | null; pieces: OutfitStep[]; index: number },
+) {
   if (!garment.isolatedUrl) throw new FlowError("generic");
   const img = await loadImage(garment.isolatedUrl);
   const canvas = toCanvas(img, 1600);
@@ -428,13 +441,8 @@ export async function tryOnBetterColor(body: Blob, garment: GarmentAnalysis, tar
   flattenOnto(px.data);
   ctx.putImageData(px, 0, 0);
   const recolored = await prepareUpload(canvas, 1600);
-  const over = baseUrl
-    ? await tryOnOver(baseUrl, recolored.blob, garment.attrs.category).catch((e) => {
-        if (e instanceof FlowError && e.code === "baseExpired") return null;
-        throw e;
-      })
-    : null;
-  const url = over ?? (await tryOn(body, recolored.blob, garment.attrs.category));
+  const { over, all } = swapSteps(look.pieces, look.index, { garment: recolored.blob, category: garment.attrs.category });
+  const url = await tryOnOutfit(body, look.baseUrl, look.baseUrl ? over : all, undefined, all);
   return { url, garmentUrl: URL.createObjectURL(recolored.blob) };
 }
 

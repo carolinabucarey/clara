@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fullLookUrl, missingSlots, outfitKey, outfitPlan, placePiece, tryOnBaseFor, wearOrder, type TryOnState } from "./look";
+import { fullLookUrl, missingSlots, outfitKey, outfitPlan, placePiece, swapSteps, tryOnBaseFor, wearOrder, type TryOnState } from "./look";
 import type { GarmentCategory } from "./types";
 
 const trial = (id: string, category: GarmentCategory, tryOnUrl?: string, tryOnOverUrl?: string): TryOnState => ({
@@ -79,5 +79,26 @@ describe("full look", () => {
   it("drops it once the outfit changes", () => {
     expect(fullLookUrl(look, "u:outfit2")).toBeUndefined();
     expect(fullLookUrl(look, null)).toBeUndefined();
+  });
+});
+
+describe("a piece in another color, over the look", () => {
+  const top = { id: "top", category: "upper_body" as const };
+  const bottom = { id: "bottom", category: "lower_body" as const };
+  const jacket = { id: "jacket", category: "outer" as const };
+
+  it("swaps only that piece and keeps the rest of the look", () => {
+    const teal = { id: "teal", category: "lower_body" as const };
+    expect(swapSteps([top, bottom], 1, teal)).toEqual({ over: [teal], all: [top, teal] });
+  });
+
+  it("puts the layer worn over it back on", () => {
+    const teal = { id: "teal", category: "upper_body" as const };
+    expect(swapSteps([top, bottom, jacket], 0, teal)).toEqual({ over: [teal, jacket], all: [teal, bottom, jacket] });
+  });
+
+  it("the layer itself goes on last already", () => {
+    const teal = { id: "teal", category: "outer" as const };
+    expect(swapSteps([top, jacket], 1, teal).over).toEqual([teal]);
   });
 });

@@ -71,6 +71,7 @@ export function LookStep({
   const key = outfitKey(look.pieces, trials, me.bodyUrl);
   const outfitUrl = multi ? (look.outfitKey === key ? look.outfitUrl : undefined) : pieceOf(order[0]).tryOnUrl;
   const outfitError = multi ? (look.outfitKey === key ? look.outfitError : undefined) : pieceOf(order[0]).tryOnError;
+  const step = (s: Slot) => ({ garment: pieceOf(s).garment.upload, category: pieceOf(s).garment.attrs.category });
 
   const runOutfit = async () => {
     request.current?.abort();
@@ -81,7 +82,6 @@ export function LookStep({
     onUpdateLook({ outfitError: undefined });
     try {
       const plan = outfitPlan(look.pieces, trials);
-      const step = (s: Slot) => ({ garment: pieceOf(s).garment.upload, category: pieceOf(s).garment.attrs.category });
       const url = await tryOnOutfit(me.bodyBlob, plan.baseUrl, plan.steps.map(step), signal, order.map(step));
       if (signal.aborted) return;
       onUpdateLook({ outfitUrl: url, outfitKey: key, outfitFidelityWarning: undefined });
@@ -267,9 +267,9 @@ export function LookStep({
       <Card className="space-y-4">
         <h2 className="font-display text-xl text-ink">{t("look.rescueTitle")}</h2>
         {order
-          .map((s) => look.pieces[s]!)
-          .filter((i) => trials[i].result)
-          .map((i) => (
+          .map((s, at) => ({ i: look.pieces[s]!, at }))
+          .filter(({ i }) => trials[i].result)
+          .map(({ i, at }) => (
             <div key={i} className="space-y-3">
               {multi && (
                 <div className="flex items-center gap-2 text-sm font-semibold text-ink">
@@ -278,7 +278,13 @@ export function LookStep({
                   {t(`attr.category.${trials[i].garment.attrs.category}`)} · {t(`colors.${trials[i].garment.color.name}`)}
                 </div>
               )}
-              <RescueSection me={me} trial={trials[i]} onUpdate={(patch) => onUpdateTrial(patch, i)} autoRun={i === current} />
+              <RescueSection
+                me={me}
+                trial={trials[i]}
+                look={{ url: outfitUrl, pieces: order.map(step), index: at }}
+                onUpdate={(patch) => onUpdateTrial(patch, i)}
+                autoRun={i === current}
+              />
             </div>
           ))}
       </Card>

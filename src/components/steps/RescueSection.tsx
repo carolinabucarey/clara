@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
-import { applyLipstick, errorCode, tryOnBetterColor } from "@/lib/flow";
+import { applyLipstick, errorCode, tryOnBetterColor, type OutfitStep } from "@/lib/flow";
 import { renderBeforeAfterCard } from "@/lib/share";
 import { lipsticksFor } from "@/lib/verdict/palette";
 import type { RescueKind } from "@/lib/types";
@@ -27,11 +27,17 @@ const ICONS: Record<RescueKind, string> = {
 export function RescueSection({
   me,
   trial,
+  look,
   onUpdate,
   autoRun,
 }: {
   me: Me;
   trial: Trial;
+  /**
+   * The look the piece is worn in: its image ("your choice", missing while it is tried on)
+   * and every piece in wear order, this one at `index`.
+   */
+  look: { url?: string; pieces: OutfitStep[]; index: number };
   onUpdate: (p: Partial<Trial>) => void;
   /** Apply the lipstick right away (only for the piece the person is looking at). */
   autoRun: boolean;
@@ -55,15 +61,23 @@ export function RescueSection({
   // Clara's color (the closest to the piece's) first, then the rest of the palette to try.
   const betterColors = result.betterColor ? [result.betterColor, ...result.palette.filter((c) => c !== result.betterColor)] : [];
   const betterShown = trial.betterPick ?? trial.betterHex ?? result.betterColor;
+  // With other pieces, the comparison is the whole look: wait for its image to try the color over it.
+  const multi = look.pieces.length > 1;
+  const lookReady = !multi || !!look.url;
+  // A recolor made over another version of the look (a piece added or removed since) no longer compares.
+  const betterUrl = trial.betterLookUrl === look.url ? trial.betterUrl : undefined;
+  const yoursUrl = look.url ?? (multi ? undefined : trial.garment.originalUrl);
 
   const runBetter = async () => {
-    if (!betterShown) return;
+    if (!betterShown || !lookReady) return;
+    const lookUrl = look.url;
     setBetterBusy(true);
     setBetterError(null);
     try {
-      // Over the same base as "your choice", so the other pieces of the look stay on.
-      const { url, garmentUrl } = await tryOnBetterColor(me.bodyBlob, trial.garment, betterShown, trial.tryOnOverUrl);
-      onUpdate({ betterUrl: url, betterGarmentUrl: garmentUrl, betterHex: betterShown });
+      // A piece alone goes over the image its own try-on was made over, or the body photo.
+      const baseUrl = (multi ? lookUrl : trial.tryOnOverUrl) ?? null;
+      const { url, garmentUrl } = await tryOnBetterColor(me.bodyBlob, trial.garment, betterShown, { baseUrl, pieces: look.pieces, index: look.index });
+      onUpdate({ betterUrl: url, betterGarmentUrl: garmentUrl, betterHex: betterShown, betterLookUrl: lookUrl });
     } catch (e) {
       setBetterError(t(`errors.${errorCode(e)}`));
     } finally {
@@ -74,9 +88,15 @@ export function RescueSection({
   // Like the lipstick, a new color waits for "Try it on me" so a stray tap doesn't spend a try-on.
   const pickBetter = (hex: string) => {
     if (hex === betterShown) return;
-    if (trial.betterUrl) setBetterCompared(true);
+    if (betterUrl) setBetterCompared(true);
     setBetterError(null);
-    onUpdate({ betterPick: hex === result.betterColor ? undefined : hex, betterUrl: undefined, betterGarmentUrl: undefined, betterHex: undefined });
+    onUpdate({
+      betterPick: hex === result.betterColor ? undefined : hex,
+      betterUrl: undefined,
+      betterGarmentUrl: undefined,
+      betterHex: undefined,
+      betterLookUrl: undefined,
+    });
   };
 
   const runLip = async () => {
@@ -123,8 +143,8 @@ export function RescueSection({
 
   const shareBetter = () =>
     renderBeforeAfterCard({
-      before: { imageUrl: trial.tryOnUrl ?? trial.garment.originalUrl, label: t("rescue.yours"), hex: trial.garment.color.hex },
-      after: { imageUrl: trial.betterUrl!, label: t("rescue.inYourColor"), hex: trial.betterHex ?? result.betterColor ?? undefined },
+      before: { imageUrl: yoursUrl!, label: t("rescue.yours"), hex: trial.garment.color.hex },
+      after: { imageUrl: betterUrl!, label: t("rescue.inYourColor"), hex: trial.betterHex ?? result.betterColor ?? undefined },
       text: t("rescue.betterBody"),
       palette: result.palette,
       labels: { title: t("rescue.betterTitle"), footer: t("privacy") },
@@ -227,15 +247,19 @@ export function RescueSection({
             disabled={betterBusy}
             captions={{ own: t("rescue.betterClosest"), others: t("rescue.betterMore") }}
           />
-          {(betterBusy || trial.betterUrl || betterCompared) && (
+          {(betterBusy || betterUrl || betterCompared) && (
             <div className="grid grid-cols-2 gap-3">
               <figure>
-                <ZoomableImage src={trial.tryOnUrl ?? trial.garment.originalUrl} className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
+                {yoursUrl ? (
+                  <ZoomableImage src={yoursUrl} className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
+                ) : (
+                  <SkeletonImage />
+                )}
                 <figcaption className="mt-1.5 text-center text-xs text-muted">{t("rescue.yours")}</figcaption>
               </figure>
               <figure>
-                {trial.betterUrl ? (
-                  <ZoomableImage src={trial.betterUrl} className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
+                {betterUrl ? (
+                  <ZoomableImage src={betterUrl} className="aspect-[3/4] w-full rounded-2xl bg-cream object-cover" />
                 ) : (
                   <SkeletonImage label={betterBusy ? t("rescue.betterApplying") : undefined} />
                 )}
@@ -243,14 +267,14 @@ export function RescueSection({
               </figure>
             </div>
           )}
-          {canRecolor && !trial.betterUrl && !betterBusy && !betterError && (
+          {canRecolor && !betterUrl && !betterBusy && !betterError && (
             <div className="flex justify-end">
-              <Button variant="secondary" onClick={runBetter}>
+              <Button variant="secondary" onClick={runBetter} disabled={!lookReady}>
                 {t("rescue.betterTry")}
               </Button>
             </div>
           )}
-          {trial.betterUrl && !betterBusy && (
+          {betterUrl && !betterBusy && (
             <div className="flex flex-wrap justify-end gap-3">
               <ShareButton render={shareBetter} filename="clara-in-your-color.png" />
             </div>

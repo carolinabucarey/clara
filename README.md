@@ -39,7 +39,8 @@ answers "how does this look on me?" with an honest, explained verdict.
    undertone on your own photo (before/after). Cut rescues (belt, tuck, layer, shoes…) and "the same piece
    in your color" come from the same evidence.
 7. **The full look.** Add the missing half (a bottom for a top, a top for a bottom, a layer) and Clara tries
-   the pieces on together by chaining try-ons, reusing the ones it already has. A deterministic outfit verdict
+   the pieces on together by chaining try-ons, reusing the ones it already has. "The same piece in your color"
+   is then tried on over the whole look, so the comparison keeps the other pieces. A deterministic outfit verdict
    explains how they work together (color between the pieces, volume, top length against the rise); with a
    single piece, Clara says which colors and cuts to look for.
 8. **Hair color and makeup.** Clara suggests three hair colors in the person's undertone, close to the depth
