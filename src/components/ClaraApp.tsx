@@ -8,7 +8,7 @@ import { fullLookUrl, missingSlots, outfitKey, placePiece, removePiece, tryOnBas
 import { deleteAccount, signOut, useAccount } from "@/lib/account/session";
 import { deleteAllData, hasProfile, loadProfile, saveProfile } from "@/lib/account/profile";
 import { LOOK_NAME_MAX, openSavedLook, saveLook, type SavedLook } from "@/lib/account/looks";
-import { makeupEffects } from "@/lib/beauty/makeup";
+import { makeupEffects, shadeOf, type MakeupShades } from "@/lib/beauty/makeup";
 import { SaveError } from "@/lib/account/storage";
 import { evaluateOutfit } from "@/lib/verdict/outfit";
 import { slotFor } from "@/lib/types";
@@ -61,6 +61,8 @@ export interface Trial {
   draft?: VerdictDraft;
   draftLocale?: string;
   draftInputKey?: string;
+  /** Lipstick the person picked to try instead of Clara's (a `lipsticks` name). */
+  lipShade?: string;
   lipUrl?: string;
   lipBeforeUrl?: string;
   /** "Better version": the same garment recolored to the user's palette, tried on. */
@@ -85,6 +87,8 @@ export interface Look {
   /** Chosen hair color (hex of one of Clara's shades); undefined keeps the person's own. */
   hairColor?: string;
   makeupOff?: MakeupCategory[];
+  /** Shades picked instead of Clara's, per makeup step. */
+  makeupShades?: MakeupShades;
   hairUrl?: string;
   hairKey?: string;
   faceUrl?: string;
@@ -203,7 +207,7 @@ export function ClaraApp() {
       if ((patch.fullUrl || patch.fullError) && l.fullKey !== patch.fullKey) return l;
       return {
         ...l,
-        ...("hairColor" in patch || "makeupOff" in patch ? STALE_FACE : {}),
+        ...("hairColor" in patch || "makeupOff" in patch || "makeupShades" in patch ? STALE_FACE : {}),
         ...patch,
       };
     }));
@@ -383,6 +387,7 @@ export function ClaraApp() {
         outfitKey: loaded.outfitUrl ? outfitKey(pieces, all, me.bodyUrl) : undefined,
         hairColor: styled ? saved.hairColor?.hex : undefined,
         makeupOff: saved.makeup ? MAKEUP_CATEGORIES.filter((c) => !saved.makeup!.some((m) => m.category === c)) : undefined,
+        makeupShades: saved.makeup ? Object.fromEntries(saved.makeup.map((m) => [m.category, shadeOf(m)])) : undefined,
         faceUrl: loaded.faceUrl,
         faceKey: loaded.faceUrl ? `${me.selfieWideUrl}|${lookSpec}` : undefined,
         fullUrl: loaded.fullUrl,

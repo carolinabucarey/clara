@@ -143,6 +143,7 @@ export const en = {
     lipTitle: "Same look, a {name} lip",
     lipApplying: "Applying the lipstick with YouCam…",
     lipTry: "Try this lipstick on me",
+    lipOther: "A {name} lipstick you picked to try. The one in your palette is {palette}.",
     before: "Before",
     after: "After",
     betterTitle: "The same piece in your color",
@@ -216,6 +217,10 @@ export const en = {
       top_any: "Any top works with this bottom: pick one in your colors, since it sits near your face.",
     },
   },
+  shadePicker: {
+    palette: "Your palette",
+    others: "Others to try",
+  },
   beauty: {
     title: "Hair color and makeup",
     subtitle: "Clara suggests a complete look, face included. You choose what you want to see.",
@@ -250,6 +255,11 @@ export const en = {
       liner_medium: "A {shade} liner, as defined as your medium contrast (ΔL {deltaL}).",
       liner_low: "A soft {shade} liner, in tune with your gentle contrast (ΔL {deltaL}).",
       lip: "A {name} lip, in your {undertone} undertone.",
+      blush_try: "A {shade} blush you picked to try.",
+      blush_shape_try: "A {shade} blush you picked to try, placed for your {shape} face.",
+      eyes_try: "{shade} eyes you picked to try.",
+      liner_try: "A {shade} liner you picked to try.",
+      lip_try: "A {name} lip you picked to try.",
     },
     hairWhy: {
       warm: "A {shade} shade with a golden glint goes with your warm undertone (skin hue {skinHue}°).",
@@ -461,6 +471,10 @@ export const en = {
     chestnut: "chestnut",
     chocolate: "chocolate",
     soft_black: "soft black",
+    smoky: "smoky grey",
+    plum: "plum",
+    olive: "olive",
+    navy: "navy",
   },
   faceShapes: {
     oval: "oval",

@@ -145,6 +145,7 @@ export const es: Dictionary = {
     lipTitle: "El mismo look, con labial {name}",
     lipApplying: "Aplicando el labial con YouCam…",
     lipTry: "Probarme este labial",
+    lipOther: "Un labial {name} que elegiste para probar. El de tu paleta es el {palette}.",
     before: "Antes",
     after: "Después",
     betterTitle: "La misma prenda en tu color",
@@ -218,6 +219,10 @@ export const es: Dictionary = {
       top_any: "Cualquier parte de arriba funciona: elígela en tus colores, porque va cerca de tu cara.",
     },
   },
+  shadePicker: {
+    palette: "Tu paleta",
+    others: "Otros para probar",
+  },
   beauty: {
     title: "Color de pelo y maquillaje",
     subtitle: "Clara sugiere un look completo, cara incluida. Tú eliges qué quieres ver.",
@@ -252,6 +257,11 @@ export const es: Dictionary = {
       liner_medium: "Un delineado {shade}, tan definido como tu contraste medio (ΔL {deltaL}).",
       liner_low: "Un delineado {shade} suave, en sintonía con tu contraste delicado (ΔL {deltaL}).",
       lip: "Un labial {name}, en tu subtono {undertone}.",
+      blush_try: "Un rubor {shade} que elegiste para probar.",
+      blush_shape_try: "Un rubor {shade} que elegiste para probar, ubicado para tu rostro {shape}.",
+      eyes_try: "Unos ojos en {shade} que elegiste para probar.",
+      liner_try: "Un delineado {shade} que elegiste para probar.",
+      lip_try: "Un labial {name} que elegiste para probar.",
     },
     hairWhy: {
       warm: "Un tono {shade}, de reflejo dorado, acompaña tu subtono cálido (matiz de piel {skinHue}°).",
@@ -463,6 +473,10 @@ export const es: Dictionary = {
     chestnut: "castaño",
     chocolate: "chocolate",
     soft_black: "negro suave",
+    smoky: "gris humo",
+    plum: "ciruela",
+    olive: "oliva",
+    navy: "azul marino",
   },
   faceShapes: {
     oval: "ovalado",

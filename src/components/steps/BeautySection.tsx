@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { applyHairColor, applyLookOnBody, applyMakeupLook, errorCode } from "@/lib/flow";
-import { makeupEffects, makeupFor } from "@/lib/beauty/makeup";
+import { makeupEffects, makeupFor, makeupShades, shadeOf } from "@/lib/beauty/makeup";
 import { hairColorsFor } from "@/lib/beauty/haircolor";
-import type { BeautyPrefs } from "@/lib/types";
+import type { BeautyPrefs, MakeupCategory } from "@/lib/types";
 import type { Look, Me } from "../ClaraApp";
-import { Button, Card, cx, ErrorNote, Note, SkeletonImage } from "../ui";
+import { Button, Card, cx, ErrorNote, Note, ShadePicker, SkeletonImage } from "../ui";
 import { ZoomableImage } from "../ZoomableImage";
 
 /** A hair color to pick: the dye as a round swatch, or the person's own hair in the selfie. */
@@ -72,9 +72,10 @@ export function BeautySection({
   const hairColors = useMemo(() => hairColorsFor(me.profile), [me.profile]);
   const hair = hairColors.find((c) => c.hex === look.hairColor) ?? null;
 
+  const shades = useMemo(() => makeupShades(me.profile), [me.profile]);
   const steps = useMemo(
-    () => (beauty.makeup ? makeupFor(me.profile, faceShape, outfitHexes) : []),
-    [beauty.makeup, me.profile, faceShape, outfitHexes],
+    () => (beauty.makeup ? makeupFor(me.profile, faceShape, outfitHexes, look.makeupShades) : []),
+    [beauty.makeup, me.profile, faceShape, outfitHexes, look.makeupShades],
   );
   const kept = steps.filter((s) => !look.makeupOff?.includes(s.category));
   const effects = makeupEffects(kept);
@@ -126,10 +127,19 @@ export function BeautySection({
     }
   };
 
-  const toggleStep = (category: (typeof steps)[number]["category"]) => {
+  const toggleStep = (category: MakeupCategory) => {
     const off = look.makeupOff ?? [];
     onUpdateLook({ makeupOff: off.includes(category) ? off.filter((c) => c !== category) : [...off, category] });
   };
+
+  /** Picking a shade also puts the step back in the look. */
+  const pickShade = (category: MakeupCategory, name: string) => {
+    const picked = { ...look.makeupShades };
+    if (name === shades[category][0].name) delete picked[category];
+    else picked[category] = name;
+    onUpdateLook({ makeupShades: picked, makeupOff: look.makeupOff?.filter((c) => c !== category) });
+  };
+  const shadeLabel = (category: MakeupCategory, name: string) => t(category === "lip_color" ? `lipsticks.${name}` : `shades.${name}`);
 
   return (
     <Card className="space-y-5">
@@ -197,9 +207,17 @@ export function BeautySection({
                       <span key={c} className="block h-6 w-6 rounded-full border border-black/10" style={{ background: c }} aria-hidden />
                     ))}
                   </span>
-                  <div className={cx("flex-1", !on && "opacity-50")}>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">{t(`beauty.categories.${s.category}`)}</p>
-                    <p className="text-sm leading-relaxed text-ink">{tl(`beauty.why.${s.code}`, s.params)}</p>
+                  <div className={cx("min-w-0 flex-1 space-y-2.5", !on && "opacity-50")}>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted">{t(`beauty.categories.${s.category}`)}</p>
+                      <p className="text-sm leading-relaxed text-ink">{tl(`beauty.why.${s.code}`, s.params)}</p>
+                    </div>
+                    <ShadePicker
+                      shades={shades[s.category]}
+                      value={shadeOf(s)}
+                      onChange={(name) => pickShade(s.category, name)}
+                      label={(name) => shadeLabel(s.category, name)}
+                    />
                   </div>
                   <input
                     type="checkbox"

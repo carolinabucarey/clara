@@ -4,7 +4,7 @@ import { deltaE, hexToLab } from "../color/lab";
 import { hasKey } from "../i18n";
 import { hairColorParams, PARAM_SCHEMAS } from "../youcam/features";
 import { readFaceShape } from "../youcam/browser";
-import { makeupEffects, makeupFor } from "./makeup";
+import { makeupEffects, makeupFor, makeupShades, shadeOf } from "./makeup";
 import { hairColorsFor } from "./haircolor";
 
 const warm = buildColorProfile({ skin: "#d9a98a", hair: "#3b2a20", eye: "#4a3426" });
@@ -28,6 +28,32 @@ describe("makeup suggestion", () => {
   it("builds effects YouCam accepts", () => {
     const params = { effects: makeupEffects(makeupFor(warm, "oval", [])), version: "1.0" };
     expect(PARAM_SCHEMAS["makeup-vto"].safeParse(params).success).toBe(true);
+  });
+
+  it("offers Clara's shade first, then others to try, each named in both languages", () => {
+    const shades = makeupShades(warm);
+    for (const step of makeupFor(warm, null, [])) {
+      const options = shades[step.category];
+      expect(options[0].colors).toEqual(step.colors);
+      expect(options.length).toBeGreaterThan(2);
+      expect(new Set(options.map((o) => o.name)).size).toBe(options.length);
+      const ns = step.category === "lip_color" ? "lipsticks" : "shades";
+      for (const o of options) expect(hasKey("es", `${ns}.${o.name}`) && hasKey("en", `${ns}.${o.name}`)).toBe(true);
+    }
+  });
+
+  it("swaps in the shades the person picked, keeping Clara's intensity and placement", () => {
+    const clara = makeupFor(warm, "round", []);
+    const picked = makeupFor(warm, "round", [], { lip_color: "wine", eye_shadow: "smoky", blush: "not_a_shade" });
+    const wine = makeupShades(warm).lip_color.find((o) => o.name === "wine")!;
+    expect(picked[3]).toMatchObject({ code: "lip_try", colors: wine.colors, intensity: clara[3].intensity });
+    expect(shadeOf(picked[3])).toBe("wine");
+    expect(picked[1]).toMatchObject({ code: "eyes_try", pattern: clara[1].pattern, intensity: clara[1].intensity });
+    expect(picked[1].colors).toHaveLength(2);
+    expect(picked[0]).toEqual(clara[0]);
+    // Picking Clara's own shade is the same as not picking.
+    expect(makeupFor(warm, "round", [], Object.fromEntries(clara.map((s) => [s.category, shadeOf(s)])))).toEqual(clara);
+    expect(PARAM_SCHEMAS["makeup-vto"].safeParse({ effects: makeupEffects(picked), version: "1.0" }).success).toBe(true);
   });
 });
 
