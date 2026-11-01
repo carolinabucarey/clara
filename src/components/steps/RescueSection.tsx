@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { applyLipstick, errorCode, tryOnBetterColor } from "@/lib/flow";
+import { renderBeforeAfterCard } from "@/lib/share";
 import type { RescueKind } from "@/lib/types";
 import type { Me, Trial } from "../ClaraApp";
-import { Button, Card, ErrorNote, Note, SkeletonImage, Swatch } from "../ui";
+import { Button, Card, ErrorNote, Note, ShareButton, SkeletonImage, Swatch } from "../ui";
 import { ZoomableImage } from "../ZoomableImage";
 
 const ICONS: Record<RescueKind, string> = {
@@ -84,6 +85,24 @@ export function RescueSection({
 
   const lipName = lip?.lipstick ? t(`lipsticks.${lip.lipstick.name}`) : "";
 
+  const shareLip = () =>
+    renderBeforeAfterCard({
+      before: { imageUrl: trial.lipBeforeUrl ?? me.selfieUrl, label: t("rescue.before") },
+      after: { imageUrl: trial.lipUrl!, label: t("rescue.after"), hex: lip!.lipstick!.hex },
+      text: rs("lipstick", { ...lip!.params, name: lip!.lipstick!.name }),
+      palette: result.palette,
+      labels: { title: t("rescue.lipTitle", { name: lipName }), footer: t("privacy") },
+    });
+
+  const shareBetter = () =>
+    renderBeforeAfterCard({
+      before: { imageUrl: trial.tryOnUrl ?? trial.garment.originalUrl, label: t("rescue.yours"), hex: trial.garment.color.hex },
+      after: { imageUrl: trial.betterUrl!, label: t("rescue.inYourColor"), hex: trial.betterHex ?? result.betterColor ?? undefined },
+      text: t("rescue.betterBody"),
+      palette: result.palette,
+      labels: { title: t("rescue.betterTitle"), footer: t("privacy") },
+    });
+
   return (
     <div className="space-y-4">
       {result.rescues.length === 0 && <Note>{t("rescue.nothing")}</Note>}
@@ -116,6 +135,11 @@ export function RescueSection({
               <Button variant="secondary" onClick={runLip}>
                 {t("rescue.lipTry")}
               </Button>
+            </div>
+          )}
+          {trial.lipUrl && !busy && (
+            <div className="flex flex-wrap justify-end gap-3">
+              <ShareButton render={shareLip} filename="clara-lipstick.png" />
             </div>
           )}
           {error && <ErrorNote onRetry={runLip}>{error}</ErrorNote>}
@@ -182,6 +206,11 @@ export function RescueSection({
                 )}
                 <figcaption className="mt-1.5 text-center text-xs text-muted">{t("rescue.inYourColor")}</figcaption>
               </figure>
+            </div>
+          )}
+          {trial.betterUrl && !betterBusy && (
+            <div className="flex flex-wrap justify-end gap-3">
+              <ShareButton render={shareBetter} filename="clara-in-your-color.png" />
             </div>
           )}
           {betterError && <ErrorNote onRetry={runBetter}>{betterError}</ErrorNote>}

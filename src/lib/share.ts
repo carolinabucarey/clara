@@ -1,6 +1,6 @@
 "use client";
 
-// Shareable PNG cards (1080×1350) drawn on a canvas: a verdict, a comparison, a look.
+// Shareable PNG cards (1080×1350) drawn on a canvas: a verdict, a comparison, a look, a before and after.
 
 import { loadImage } from "./image";
 import type { OutfitVerdict, Verdict, VerdictDraft, VerdictResult } from "./types";
@@ -66,9 +66,15 @@ async function card(title: string) {
   ctx.fillStyle = "#241c17";
   ctx.font = `600 64px ${serif}`;
   ctx.fillText("Clara", 72, 120);
-  ctx.font = `400 30px ${sans}`;
+  // A long look name gets a smaller size, and is narrowed only if it still doesn't fit.
+  let size = 30;
+  ctx.font = `400 ${size}px ${sans}`;
+  while (size > 22 && ctx.measureText(title).width > W - 144) {
+    size -= 2;
+    ctx.font = `400 ${size}px ${sans}`;
+  }
   ctx.fillStyle = "#6f625a";
-  ctx.fillText(title, 72, 168);
+  ctx.fillText(title, 72, 168, W - 144);
   return { canvas, ctx, serif, sans };
 }
 
@@ -243,6 +249,52 @@ export async function renderLookCard(opts: {
     y += 104 + 16;
   });
   if (opts.outfit) pill(ctx, sans, x, y + 12, opts.outfit.label, opts.outfit.verdict, 28, maxW);
+
+  footer(ctx, sans, opts.labels.footer, opts.palette);
+  return png(canvas);
+}
+
+/** Two photos side by side, each with its caption and color: the piece in your color, the lipstick. */
+export async function renderBeforeAfterCard(opts: {
+  before: { imageUrl: string; label: string; hex?: string };
+  after: { imageUrl: string; label: string; hex?: string };
+  text?: string;
+  palette: string[];
+  labels: { title: string; footer: string };
+}): Promise<Blob> {
+  const { canvas, ctx, serif, sans } = await card(opts.labels.title);
+  const sides = [opts.before, opts.after];
+  const imgs = await Promise.all(sides.map((s) => loadImage(s.imageUrl)));
+
+  const gap = 32;
+  const w = (W - 144 - gap) / 2;
+  const h = (w * 4) / 3;
+  sides.forEach((s, i) => {
+    const x = 72 + i * (w + gap);
+    cover(ctx, imgs[i], x, 220, w, h);
+    // The caption centered under its photo, after the color dot.
+    ctx.font = `500 28px ${sans}`;
+    const dot = s.hex ? 40 : 0;
+    const left = x + (w - dot - ctx.measureText(s.label).width) / 2;
+    const y = 220 + h + 52;
+    if (s.hex) {
+      ctx.fillStyle = s.hex;
+      ctx.beginPath();
+      ctx.arc(left + 14, y - 10, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.1)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#241c17";
+    ctx.fillText(s.label, left + dot, y);
+  });
+
+  if (opts.text) {
+    ctx.fillStyle = "#241c17";
+    ctx.font = `500 30px ${serif}`;
+    wrap(ctx, opts.text, 72, 220 + h + 112, W - 144, 40, 3);
+  }
 
   footer(ctx, sans, opts.labels.footer, opts.palette);
   return png(canvas);
