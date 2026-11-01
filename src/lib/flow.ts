@@ -441,9 +441,11 @@ export async function checkTryOnFidelity(bodyUrl: string, tryOnUrl: string): Pro
 
 /**
  * "Better version": recolors the isolated garment (YouCam background removal) to a
- * color from the user's palette, then tries that version on with YouCam.
+ * color from the user's palette, then tries that version on with YouCam. Pass the image
+ * the piece's own try-on was made over (another piece of its look) so the rest of the
+ * outfit stays in the picture; the body photo is used when there is none or it expired.
  */
-export async function tryOnBetterColor(body: Blob, garment: GarmentAnalysis, targetHex: string) {
+export async function tryOnBetterColor(body: Blob, garment: GarmentAnalysis, targetHex: string, baseUrl?: string) {
   if (!garment.isolatedUrl) throw new FlowError("generic");
   const img = await loadImage(garment.isolatedUrl);
   const canvas = toCanvas(img, 1600);
@@ -453,7 +455,13 @@ export async function tryOnBetterColor(body: Blob, garment: GarmentAnalysis, tar
   flattenOnto(px.data);
   ctx.putImageData(px, 0, 0);
   const recolored = await prepareUpload(canvas, 1600);
-  const url = await tryOn(body, recolored.blob, garment.attrs.category);
+  const over = baseUrl
+    ? await tryOnOver(baseUrl, recolored.blob, garment.attrs.category).catch((e) => {
+        if (e instanceof FlowError && e.code === "baseExpired") return null;
+        throw e;
+      })
+    : null;
+  const url = over ?? (await tryOn(body, recolored.blob, garment.attrs.category));
   return { url, garmentUrl: URL.createObjectURL(recolored.blob) };
 }
 

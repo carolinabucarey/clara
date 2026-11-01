@@ -51,7 +51,8 @@ export function RescueSection({
     setBetterBusy(true);
     setBetterError(null);
     try {
-      const { url, garmentUrl } = await tryOnBetterColor(me.bodyBlob, trial.garment, result.betterColor);
+      // Over the same base as "your choice", so the other pieces of the look stay on.
+      const { url, garmentUrl } = await tryOnBetterColor(me.bodyBlob, trial.garment, result.betterColor, trial.tryOnOverUrl);
       onUpdate({ betterUrl: url, betterGarmentUrl: garmentUrl, betterHex: result.betterColor });
     } catch (e) {
       setBetterError(t(`errors.${errorCode(e)}`));
