@@ -2,14 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
-import { deleteLook, listLooks, lookImagePaths, type SavedLook } from "@/lib/account/looks";
+import { deleteLook, listLooks, lookImagePaths, type SavedLook, type SavedPiece } from "@/lib/account/looks";
 import { signedUrls } from "@/lib/account/storage";
-import { renderLookCard } from "@/lib/share";
+import { renderBeforeAfterCard, renderLookCard } from "@/lib/share";
 import { Button, Card, ErrorNote, EvidenceList, Note, OutfitPill, ShareButton, Spinner, StepHeader, VerdictPill } from "../ui";
 import { ZoomableImage } from "../ZoomableImage";
 
 function LookDetail({ look, urls }: { look: SavedLook; urls: Record<string, string> }) {
   const { t, tl, ev, locale } = useI18n();
+  // The piece as chosen, next to it in the person's color (as on the look step).
+  const yoursUrl = (p: SavedPiece) => (p.tryOnPath && urls[p.tryOnPath]) || urls[p.garmentPath];
+  const shareBetter = (p: SavedPiece) =>
+    renderBeforeAfterCard({
+      before: { imageUrl: yoursUrl(p), label: t("rescue.yours"), hex: p.color.hex },
+      after: { imageUrl: urls[p.better!.tryOnPath], label: t("rescue.inYourColor"), hex: p.better!.hex },
+      text: t("rescue.betterBody"),
+      palette: p.result?.palette ?? [],
+      labels: { title: t("rescue.betterTitle"), footer: t("privacy") },
+    });
   return (
     <div className="space-y-4 border-t border-line pt-4">
       <div className="grid grid-cols-2 gap-3">
@@ -41,6 +51,11 @@ function LookDetail({ look, urls }: { look: SavedLook; urls: Record<string, stri
               {t("rescue.inYourColor")}
               {look.pieces.length > 1 && <> · {t(`attr.category.${p.attrs.category}`)}</>}
             </figcaption>
+            {yoursUrl(p) && (
+              <div className="flex flex-wrap justify-center">
+                <ShareButton variant="ghost" render={() => shareBetter(p)} filename="clara-in-your-color.png" />
+              </div>
+            )}
           </figure>
         ))}
       </div>
