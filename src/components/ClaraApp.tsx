@@ -7,7 +7,7 @@ import type { GarmentAnalysis } from "@/lib/flow";
 import { fullLookUrl, missingSlots, outfitKey, placePiece, removePiece, tryOnBaseFor, wearOrder } from "@/lib/look";
 import { deleteAccount, signOut, useAccount } from "@/lib/account/session";
 import { deleteAllData, hasProfile, loadProfile, saveProfile } from "@/lib/account/profile";
-import { LOOK_NAME_MAX, openSavedLook, saveLook, type SavedHairstyle, type SavedLook } from "@/lib/account/looks";
+import { LOOK_NAME_MAX, openSavedLook, saveLook, type SavedLook } from "@/lib/account/looks";
 import { makeupEffects } from "@/lib/beauty/makeup";
 import { SaveError } from "@/lib/account/storage";
 import { evaluateOutfit } from "@/lib/verdict/outfit";
@@ -17,6 +17,7 @@ import type {
   ColorProfile,
   FaceShapeReading,
   Goal,
+  HairColorStep,
   MakeupCategory,
   MakeupStep,
   Proportions,
@@ -42,7 +43,7 @@ export interface Me {
   selfieBlob: Blob;
   bodyUrl: string;
   bodyBlob: Blob;
-  /** Head-and-shoulders crop for the hairstyle and makeup try-ons. */
+  /** Head-and-shoulders crop for the hair color and makeup try-ons. */
   selfieWideUrl: string;
   selfieWideBlob: Blob;
   faceShape: FaceShapeReading | null;
@@ -72,7 +73,7 @@ export interface Trial {
   tryOnOverUrl?: string;
 }
 
-/** Pieces worn together, plus the hair and makeup that finish the look. */
+/** Pieces worn together, plus the hair color and makeup that finish the look. */
 export interface Look {
   id: string;
   /** Trial index per slot. */
@@ -81,21 +82,21 @@ export interface Look {
   outfitKey?: string;
   outfitError?: string;
   outfitFidelityWarning?: boolean;
-  /** Chosen hairstyle template; null keeps the person's own hair, undefined means Clara's first pick. */
-  hairTemplateId?: string | null;
+  /** Chosen hair color (hex of one of Clara's shades); undefined keeps the person's own. */
+  hairColor?: string;
   makeupOff?: MakeupCategory[];
   hairUrl?: string;
   hairKey?: string;
   faceUrl?: string;
   faceKey?: string;
   faceError?: string;
-  /** Makeup on the full-body outfit photo (lib/flow applyLookOnBody). */
+  /** Hair color and makeup on the full-body outfit photo (lib/flow applyLookOnBody). */
   fullUrl?: string;
   fullKey?: string;
   fullError?: string;
   /** What the latest portrait or full look was made with, to save it alongside. */
   faceMakeup?: MakeupStep[];
-  faceHair?: SavedHairstyle | null;
+  faceHairColor?: HairColorStep | null;
   /** The name the person gives the look, saved with it. */
   name?: string;
   /** The account copy this look updates when saved again. */
@@ -117,7 +118,7 @@ const STALE_TRY_ON: Partial<Trial> = {
   ...STALE_BETTER,
 };
 const STALE_FACE: Partial<Look> = {
-  faceUrl: undefined, faceKey: undefined, faceError: undefined, fullUrl: undefined, fullKey: undefined, fullError: undefined, faceMakeup: undefined, faceHair: undefined,
+  faceUrl: undefined, faceKey: undefined, faceError: undefined, fullUrl: undefined, fullKey: undefined, fullError: undefined, faceMakeup: undefined, faceHairColor: undefined,
 };
 
 const STEPS: Array<Exclude<Step, "compare" | "looks">> = ["garment", "photos", "profile", "verdict", "look"];
@@ -142,7 +143,7 @@ export function ClaraApp() {
   const [looks, setLooks] = useState<Look[]>([]);
   /** Set while the person is adding a piece to an existing look. */
   const [complement, setComplement] = useState<{ look: number; slot: Slot } | null>(null);
-  const [beauty, setBeauty] = useState<BeautyPrefs>({ makeup: null, hair: "all" });
+  const [beauty, setBeauty] = useState<BeautyPrefs>({ makeup: null });
   /** Where "back" goes from the garment step while a new piece is being added. */
   const [back, setBack] = useState<{ current: number; step: Step } | null>(null);
 
@@ -202,7 +203,7 @@ export function ClaraApp() {
       if ((patch.fullUrl || patch.fullError) && l.fullKey !== patch.fullKey) return l;
       return {
         ...l,
-        ...("hairTemplateId" in patch || "makeupOff" in patch ? STALE_FACE : {}),
+        ...("hairColor" in patch || "makeupOff" in patch ? STALE_FACE : {}),
         ...patch,
       };
     }));
@@ -259,7 +260,7 @@ export function ClaraApp() {
           faceUrl: look.faceUrl ?? null,
           fullUrl,
           makeup: styled ? (look.faceMakeup ?? null) : null,
-          hairstyle: styled ? (look.faceHair ?? null) : null,
+          hairColor: styled ? (look.faceHairColor ?? null) : null,
         },
         look.saved,
       );
@@ -299,7 +300,7 @@ export function ClaraApp() {
     setMeFromAccount(false);
     setConsent(false);
     setPendingSave(false);
-    setBeauty({ makeup: null, hair: "all" });
+    setBeauty({ makeup: null });
     setStep("garment");
   };
 
@@ -367,8 +368,7 @@ export function ClaraApp() {
     const pieces: Look["pieces"] = Object.fromEntries(loaded.slots.map((s, i) => [s, offset + i]));
     const all = [...trials, ...loaded.trials];
     // Keys as the look and beauty sections compute them, so the saved images count as current.
-    const templateId = saved.hairstyle?.templateId ?? null;
-    const effects = JSON.stringify(makeupEffects(saved.makeup ?? []));
+    const lookSpec = `${saved.hairColor?.hex ?? ""}|${JSON.stringify(makeupEffects(saved.makeup ?? []))}`;
     const styled = !!(saved.facePath || saved.fullPath);
     const outfitShown = loaded.slots.length > 1 ? loaded.outfitUrl : loaded.trials[0]?.tryOnUrl;
     setTrials(all);
@@ -381,14 +381,14 @@ export function ClaraApp() {
         name: saved.name ?? undefined,
         outfitUrl: loaded.outfitUrl,
         outfitKey: loaded.outfitUrl ? outfitKey(pieces, all, me.bodyUrl) : undefined,
-        hairTemplateId: styled ? templateId : undefined,
+        hairColor: styled ? saved.hairColor?.hex : undefined,
         makeupOff: saved.makeup ? MAKEUP_CATEGORIES.filter((c) => !saved.makeup!.some((m) => m.category === c)) : undefined,
         faceUrl: loaded.faceUrl,
-        faceKey: loaded.faceUrl ? `${me.selfieWideUrl}|${templateId ?? ""}|${effects}` : undefined,
+        faceKey: loaded.faceUrl ? `${me.selfieWideUrl}|${lookSpec}` : undefined,
         fullUrl: loaded.fullUrl,
-        fullKey: loaded.fullUrl && outfitShown ? `${outfitShown}|${effects}` : undefined,
+        fullKey: loaded.fullUrl && outfitShown ? `${outfitShown}|${lookSpec}` : undefined,
         faceMakeup: saved.makeup ?? undefined,
-        faceHair: saved.hairstyle,
+        faceHairColor: saved.hairColor,
       },
     ]);
     setCurrent(offset);
@@ -655,7 +655,7 @@ export function ClaraApp() {
             onBeauty={changeBeauty}
             onChange={(patch) => {
               setMe({ ...me, ...patch });
-              // The face shape only feeds hair and makeup; color and body corrections change the verdicts.
+              // The face shape only feeds the makeup; color and body corrections change the verdicts.
               if (patch.profile || patch.proportions) setTrials((ts) => ts.map((tr) => ({ ...tr, ...STALE_VERDICT })));
               setLooks((ls) => ls.map((l) => ({ ...l, ...STALE_FACE })));
             }}

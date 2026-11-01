@@ -249,7 +249,7 @@ export interface ComplementSuggestion {
   tips: string[];
 }
 
-// ---------- Beauty (face shape, makeup, hairstyle) ----------
+// ---------- Beauty (face shape, makeup, hair color) ----------
 
 export const FACE_SHAPES = ["oval", "round", "square", "heart", "oblong", "diamond", "triangle", "inv_triangle"] as const;
 export type FaceShape = (typeof FACE_SHAPES)[number];
@@ -262,12 +262,9 @@ export interface FaceShapeReading {
   corrected?: boolean;
 }
 
-export type HairStyleGroup = "feminine" | "masculine" | "all";
-
 export interface BeautyPrefs {
   /** null until the person answers. */
   makeup: boolean | null;
-  hair: HairStyleGroup;
 }
 
 export type MakeupCategory = "lip_color" | "blush" | "eye_shadow" | "eye_liner";
@@ -283,11 +280,10 @@ export interface MakeupStep {
   params?: Record<string, string | number>;
 }
 
-export interface HairSuggestion {
-  templateId: string;
-  title: string;
-  thumb: string | null;
-  /** Evidence code (i18n `beauty.hairWhy.<code>`). */
+export interface HairColorStep {
+  /** The dye color YouCam applies over the person's own hair. */
+  hex: string;
+  /** Evidence code (i18n `beauty.hairWhy.<code>`) and its params; `shade` names the color. */
   code: string;
-  params?: Record<string, string | number>;
+  params: Record<string, string | number>;
 }

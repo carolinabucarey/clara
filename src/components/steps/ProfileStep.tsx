@@ -234,12 +234,6 @@ export function ProfileStep({
           ]}
           onChange={(v) => onBeauty({ ...beauty, makeup: v === "yes" })}
         />
-        <ChipSelect
-          label={t("beauty.hairQuestion")}
-          value={beauty.hair}
-          options={(["feminine", "masculine", "all"] as const).map((v) => ({ value: v, label: t(`beauty.hairGroups.${v}`) }))}
-          onChange={(hair) => onBeauty({ ...beauty, hair })}
-        />
       </Card>
 
       <Card className="space-y-3">

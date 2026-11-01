@@ -10,6 +10,7 @@ import { downloadImage, removeImages, SaveError, signedInClient, uploadImage } f
 import type {
   GarmentAttributes,
   GarmentColor,
+  HairColorStep,
   MakeupStep,
   OutfitResult,
   Slot,
@@ -32,13 +33,6 @@ export interface SavedPiece {
   source?: { url: string; title: string | null };
 }
 
-export interface SavedHairstyle {
-  templateId: string;
-  title: string;
-  code?: string;
-  params?: Record<string, string | number>;
-}
-
 export interface SavedLook {
   id: string;
   name: string | null;
@@ -50,7 +44,7 @@ export interface SavedLook {
   facePath: string | null;
   fullPath: string | null;
   makeup: MakeupStep[] | null;
-  hairstyle: SavedHairstyle | null;
+  hairColor: HairColorStep | null;
 }
 
 export interface LookToSave {
@@ -61,7 +55,7 @@ export interface LookToSave {
   faceUrl: string | null;
   fullUrl: string | null;
   makeup: MakeupStep[] | null;
-  hairstyle: SavedHairstyle | null;
+  hairColor: HairColorStep | null;
 }
 
 interface LookRow {
@@ -75,7 +69,7 @@ interface LookRow {
   face_path: string | null;
   full_look_path?: string | null;
   makeup: MakeupStep[] | null;
-  hairstyle: SavedHairstyle | null;
+  hair_color?: HairColorStep | null;
 }
 
 function fromRow(r: LookRow): SavedLook {
@@ -91,7 +85,7 @@ function fromRow(r: LookRow): SavedLook {
     facePath: r.face_path,
     fullPath: r.full_look_path ?? null,
     makeup: r.makeup,
-    hairstyle: r.hairstyle,
+    hairColor: r.hair_color ?? null,
   };
 }
 
@@ -164,7 +158,7 @@ export async function saveLook(input: LookToSave, existing?: SavedLook | null): 
       face_path: await upload("face", input.faceUrl),
       full_look_path: await upload("full", input.fullUrl).catch(() => null),
       makeup: input.makeup,
-      hairstyle: input.hairstyle,
+      hair_color: input.hairColor,
       updated_at: new Date().toISOString(),
     };
     const query = existing

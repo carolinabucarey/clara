@@ -42,16 +42,16 @@ answers "how does this look on me?" with an honest, explained verdict.
    the pieces on together by chaining try-ons, reusing the ones it already has. A deterministic outfit verdict
    explains how they work together (color between the pieces, volume, top length against the rise); with a
    single piece, Clara says which colors and cuts to look for.
-8. **Hair and makeup.** YouCam **AI Face Analyzer** reads the face shape once; Clara suggests three haircuts
-   from YouCam's **AI Hairstyle** catalog with the reason for each, and, if the person wants it, a makeup look
-   (blush, eyes, liner, lips) from their undertone, depth and contrast that lets the outfit's color lead. Both
-   are tried on a head-and-shoulders crop of the selfie, before/after. The makeup (not the haircut, which never
-   blended in) can also be put on the full-body outfit photo: the head is cropped, enlarged, made up and pasted
-   back, since the face there is too small for YouCam.
-   The person chooses which haircut styles to see and whether to see makeup: Clara never guesses gender.
+8. **Hair color and makeup.** Clara suggests three hair colors in the person's undertone, close to the depth
+   of the hair they have, with the reason for each; YouCam's **AI Hair Color** dyes only the color, the cut
+   stays. If the person wants it, a makeup look (blush, eyes, liner, lips) comes from their undertone, depth and
+   contrast and lets the outfit's color lead; YouCam **AI Face Analyzer** reads the face shape once to place the
+   blush. Both are tried on a head-and-shoulders crop of the selfie, before/after, and can also be put on the
+   full-body outfit photo: the head is cropped, enlarged, edited and pasted back, since the face there is too
+   small for YouCam (the hair gets a taller crop, so long hair is dyed to its ends).
 9. **Compare and save.** "Which one?" ranks the pieces tried in the session; the verdict can be downloaded or
    shared as an image card. With an account, looks (and, with consent, the profile) are saved, and a saved look
-   can be reopened, changed (pieces, haircut, makeup) and saved again.
+   can be reopened, changed (pieces, hair color, makeup) and saved again.
 
 ## YouCam APIs used
 
@@ -61,12 +61,12 @@ answers "how does this look on me?" with an honest, explained verdict.
 | AI Clothes Virtual Try-On | `cloth-v4` (fallback `cloth`) | The chosen garment, on the user |
 | AI Makeup Virtual Try-On | `makeup-vto` (`lip_color`, `blush`, `eye_shadow`, `eye_liner`) | Lipstick rescue and the suggested makeup look |
 | AI Photo Background Removal | `sod` | Isolating the garment before measuring its color |
-| AI Hairstyle Virtual Try-On | `hair-transfer` (v2.1, preset templates) | The suggested haircuts, keeping the person's hair color |
-| AI Face Analyzer | `face-attr-analysis` (`faceShape`, `faceAspectRatio`) | Face shape behind the haircut and blush advice |
+| AI Hair Color Virtual Try-On | `hair-color` (full pattern, one custom palette) | The suggested hair colors, keeping the cut |
+| AI Face Analyzer | `face-attr-analysis` (`faceShape`, `faceAspectRatio`) | Face shape behind the blush placement |
 
 All calls follow the V2 pattern: register the file (`POST /s2s/v2.0/file/{feature}`), `PUT` the bytes to the
-signed URL, create the task (`POST /s2s/{version}/task/{feature}`, v2.1 for `hair-transfer`) and poll its
-status (`GET /s2s/{version}/task/{feature}/{task_id}`). The API key lives only on the server.
+signed URL, create the task (`POST /s2s/v2.0/task/{feature}`) and poll its status
+(`GET /s2s/v2.0/task/{feature}/{task_id}`). The API key lives only on the server.
 
 ## Trust principles (every screen follows them)
 
@@ -92,8 +92,8 @@ Browser (Next.js client)                 Server (Next.js route handlers)        
 - photo capture, resize, face crop  ──▶  /api/youcam/{feature}  (upload+task) ──▶  skin-tone-analysis
 - MediaPipe pose + segmentation          /api/youcam/{feature}/{taskId} (poll)     cloth-v4 / cloth
   (proportions, locally)                 /api/youcam/image (result proxy)          makeup-vto, sod
-- color k-means on the garment           /api/youcam/hair-templates               hair-transfer
-- outfit, makeup, haircut rules          /api/garment  (Claude vision)             face-attr-analysis
+- color k-means on the garment           /api/garment  (Claude vision)             hair-color
+- outfit, makeup, hair color rules                                                 face-attr-analysis
                                          /api/garment/link (store page → product photos, SSRF-guarded)
 - wizard UI, share card             ◀──  /api/verdict  (rules → Claude text)
         │                                /api/account  (DELETE, service role)
@@ -104,7 +104,7 @@ Browser (Next.js client)                 Server (Next.js route handlers)        
 - `src/lib/color/` — CIELAB math, color profile, garment color description, dominant colors.
 - `src/lib/pose/` — MediaPipe wrapper (browser) and pure proportion measurement.
 - `src/lib/verdict/` — color rules, cut rules, outfit rules, rescues, palettes, Claude drafting + validator.
-- `src/lib/beauty/` — makeup suggestion, haircut tagging and face-shape rules.
+- `src/lib/beauty/` — makeup and hair color suggestions.
 - `src/lib/look.ts` — pieces of a look by slot and the plan to try them on together.
 - `src/lib/account/`, `src/lib/supabase/` — sign-in, saved looks and profile (browser, under RLS).
 - `supabase/migrations/` — tables, row-level security and the private storage bucket.
