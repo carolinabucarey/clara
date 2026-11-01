@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { analyzeBody, analyzeSelfie, errorCode } from "@/lib/flow";
+import { parseCm } from "@/lib/height";
 import type { Me } from "../ClaraApp";
 import { Button, Card, cx, ErrorNote, FilePicker, Note, Spinner, StepHeader } from "../ui";
 
@@ -88,17 +89,34 @@ export function PhotosStep({
   const [busy, setBusy] = useState(false);
   const [selfieError, setSelfieError] = useState<string | null>(null);
   const [bodyError, setBodyError] = useState<string | null>(null);
+  /** The person tapped "analyze" with something missing: say what instead of doing nothing. */
+  const [tried, setTried] = useState(false);
+  const [failures, setFailures] = useState(0);
+  const photos = useRef<HTMLDivElement>(null);
 
   const request = useRef(0);
   useEffect(() => () => { request.current++; }, []);
 
-  const heightCm = unit === "cm" ? Number(cm) : Math.round((Number(ft) * 12 + Number(inch)) * 2.54);
+  // The errors sit under each photo, out of sight on a phone: bring the first one into view.
+  useEffect(() => {
+    if (failures) photos.current?.querySelector('[role="alert"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [failures]);
+
+  const heightCm = unit === "cm" ? parseCm(cm) : Math.round((Number(ft) * 12 + Number(inch)) * 2.54);
   const heightOk = Number.isFinite(heightCm) && heightCm >= 120 && heightCm <= 215;
   const changed = !!(selfie || body);
-  const ready = (me ? changed : !!(selfie && body)) && (!body || heightOk);
+  const missing = [
+    !me && !selfie && t("photos.needSelfie"),
+    !me && !body && t("photos.needBody"),
+    (!me || body) && !heightOk && t(unit === "cm" ? "photos.needHeightCm" : "photos.needHeightFt"),
+  ].filter((m): m is string => !!m);
+  const ready = changed && missing.length === 0;
 
   const analyze = async () => {
-    if (!ready) return;
+    if (!ready) {
+      setTried(true);
+      return;
+    }
     setSelfieError(null);
     setBodyError(null);
     setBusy(true);
@@ -118,7 +136,10 @@ export function PhotosStep({
     setBusy(false);
     if (s.status === "rejected") setSelfieError(t(`errors.${errorCode(s.reason)}`));
     if (b.status === "rejected") setBodyError(t(`errors.${errorCode(b.reason)}`));
-    if (s.status === "rejected" || b.status === "rejected") return;
+    if (s.status === "rejected" || b.status === "rejected") {
+      setFailures((n) => n + 1);
+      return;
+    }
     const face = s.value && { ...s.value, measuredProfile: s.value.profile };
     const figure = b.value && { ...b.value, measuredProportions: b.value.proportions };
     if (me) onDone({ ...me, ...face, ...figure }, { selfie: !!face, body: !!figure });
@@ -132,13 +153,16 @@ export function PhotosStep({
       <StepHeader title={t("photos.title")} subtitle={me ? undefined : t("photos.subtitle")} />
       {me && <Note>{`${fromAccount ? t("photos.savedAccount") : t("photos.savedProfile")} ${t("photos.changeHint")}`}</Note>}
       <fieldset disabled={busy} className="space-y-5">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div ref={photos} className="grid gap-4 sm:grid-cols-2">
           <PhotoSlot
             title={t("photos.selfie")}
             tips={t("photos.selfieTips")}
             file={selfie}
             current={me?.selfieWideUrl}
-            onFile={setSelfie}
+            onFile={(f) => {
+              setSelfie(f);
+              setSelfieError(null);
+            }}
             onKeepCurrent={() => {
               setSelfie(null);
               setSelfieError(null);
@@ -150,7 +174,10 @@ export function PhotosStep({
             tips={t("photos.bodyTips")}
             file={body}
             current={me?.bodyUrl}
-            onFile={setBody}
+            onFile={(f) => {
+              setBody(f);
+              setBodyError(null);
+            }}
             onKeepCurrent={() => {
               setBody(null);
               setBodyError(null);
@@ -166,7 +193,7 @@ export function PhotosStep({
                 <span className="text-sm font-semibold text-ink">{t("photos.height")}</span>
                 {unit === "cm" ? (
                   <span className="flex items-center gap-2">
-                    <input className={cx(input, "w-24")} inputMode="numeric" value={cm} onChange={(e) => setCm(e.target.value)} />
+                    <input className={cx(input, "w-24")} inputMode="decimal" value={cm} onChange={(e) => setCm(e.target.value)} />
                     <span className="text-sm text-muted">{t("common.cm")}</span>
                   </span>
                 ) : (
@@ -196,12 +223,13 @@ export function PhotosStep({
             </label>
           </Card>
         )}
+        {tried && missing.length > 0 && <ErrorNote>{missing.join(" ")}</ErrorNote>}
         <div className="flex flex-wrap items-center justify-end gap-4">
           {busy && <Spinner label={selfie ? t("photos.measuringColor") : t("photos.measuringBody")} />}
           {me && !changed ? (
             <Button onClick={onKeep}>{t("common.continue")}</Button>
           ) : (
-            <Button onClick={analyze} disabled={!ready || busy}>
+            <Button onClick={analyze} disabled={busy}>
               {t("photos.analyze")}
             </Button>
           )}
