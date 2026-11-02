@@ -89,9 +89,8 @@ export function extractProductImages(html: string, pageUrl: string): { title: st
 
 /** Loopback, private, link-local, CGNAT and other non-public addresses. */
 export function isPrivateAddress(ip: string): boolean {
-  const v4 = ip.startsWith("::ffff:") ? ip.slice(7) : ip;
-  if (isIP(v4) === 4) {
-    const [a, b] = v4.split(".").map(Number);
+  if (isIP(ip) === 4) {
+    const [a, b] = ip.split(".").map(Number);
     return (
       a === 0 ||
       a === 10 ||
@@ -104,8 +103,17 @@ export function isPrivateAddress(ip: string): boolean {
       a >= 224
     );
   }
-  const v6 = ip.toLowerCase();
-  return v6 === "::" || v6 === "::1" || v6.startsWith("fc") || v6.startsWith("fd") || /^fe[89ab]/.test(v6);
+  if (isIP(ip) !== 6) return true;
+  // URL normalizes expanded IPv6 and dotted IPv4-mapped addresses to hex groups.
+  const v6 = new URL(`http://[${ip}]/`).hostname.slice(1, -1);
+  const mapped = v6.match(/^::ffff:([0-9a-f]+):([0-9a-f]+)$/);
+  if (mapped) {
+    const hi = parseInt(mapped[1], 16);
+    const lo = parseInt(mapped[2], 16);
+    return isPrivateAddress(`${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`);
+  }
+  // Only global unicast IPv6 (2000::/3); exclude local, multicast and translation ranges.
+  return !/^[23][0-9a-f]{3}:/.test(v6);
 }
 
 async function assertPublic(url: URL) {

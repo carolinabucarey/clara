@@ -7,6 +7,12 @@ how to make it work.
 
 Built for the YouCam hackathon, category **eCommerce VTO** (beauty + fashion in one experience).
 
+**Live app: [Open Clara](https://clara-sigma-swart.vercel.app/)**
+
+**For judges:** [watch the 3-minute demo](https://www.youtube.com/watch?v=5JENJYa0638) ·
+[testing instructions and API evidence](docs/judging.md).
+The core flow works without an account; sign-in is only needed to save looks.
+
 ## Why
 
 Buying clothes online means deciding alone. A friend is kind but not an expert; a stylist is expert but

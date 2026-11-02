@@ -29,12 +29,12 @@ describe("product photos from a store page", () => {
 
 describe("private address guard", () => {
   it("blocks loopback, private, link-local and CGNAT addresses", () => {
-    for (const ip of ["127.0.0.1", "10.1.2.3", "172.20.0.1", "192.168.1.10", "169.254.169.254", "100.64.0.1", "0.0.0.0", "::1", "fd00::1", "fe80::1", "::ffff:127.0.0.1"]) {
+    for (const ip of ["127.0.0.1", "10.1.2.3", "172.20.0.1", "192.168.1.10", "169.254.169.254", "100.64.0.1", "0.0.0.0", "::1", "fd00::1", "fe80::1", "::ffff:127.0.0.1", "::ffff:7f00:1", "::ffff:a00:1", "0:0:0:0:0:0:0:1", "ff02::1", "64:ff9b::7f00:1"]) {
       expect(isPrivateAddress(ip)).toBe(true);
     }
   });
   it("allows public addresses", () => {
-    for (const ip of ["104.18.10.1", "8.8.8.8", "2606:4700::6810:84e5"]) expect(isPrivateAddress(ip)).toBe(false);
+    for (const ip of ["104.18.10.1", "8.8.8.8", "2606:4700::6810:84e5", "::ffff:8.8.8.8", "::ffff:808:808"]) expect(isPrivateAddress(ip)).toBe(false);
   });
 });
 

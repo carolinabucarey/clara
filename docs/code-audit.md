@@ -1,5 +1,41 @@
 # Auditoría de código de Clara
 
+## Revisión final — 2 de noviembre de 2026
+
+Se verificó la versión `e3403b1` en un checkout aislado mientras entraban fusiones en el
+repositorio principal. Los cambios de aplicación de esa versión coinciden con `main` en
+`5ac54d1`; la revisión final añade los siguientes ajustes:
+
+- El proxy de fotos de tiendas ya no reenvía SVG/HTML ni confía en el tipo declarado por
+  la tienda. Detecta PNG, JPEG, WebP, GIF y AVIF por su firma binaria y añade `nosniff`
+  y una política CSP restrictiva. La identificación AVIF sigue los identificadores de
+  [la especificación de AOMedia](https://aomediacodec.github.io/av1-avif/latest-approved.html).
+- El filtro de direcciones reconoce IPv4 privadas encapsuladas en IPv6, incluidas las
+  formas hexadecimales que normaliza `URL`. Los destinos de las redirecciones se revisan.
+- El importador de tiendas limita el cuerpo JSON, comprueba el origen del navegador y
+  aplica límites por IP antes de efectuar peticiones remotas.
+- El README enlaza la app, el video y una guía en inglés para ejecutar y evaluar Clara.
+  El texto preparado para Devpost refleja el cambio actual de color de cabello.
+
+Verificación de esta revisión: lint y TypeScript correctos; 125 pruebas en 16 archivos;
+compilación de producción correcta; cero vulnerabilidades de producción reportadas por
+`npm audit --omit=dev`; `git diff --check` correcto. Los modelos de pose y rostro y el
+WASM responden HTTP 200 en producción local. El navegador carga Clara y cambia de idioma;
+un link de loopback encapsulado en IPv6 muestra un error recuperable. Sin errores de
+aplicación en la consola; MediaPipe emite avisos de diagnóstico de OpenGL.
+
+La app desplegada se abre sin sesión. El video `5JENJYa0638` se reproduce sin iniciar
+sesión, figura como no listado y dura 3:00; muestra la interfaz y explica el flujo en inglés.
+Su descripción enumera las seis APIs actuales, pero todavía contiene `Try Clara: [LINK]`.
+La configuración de GitHub confirma que el repositorio es público y no tiene una licencia
+detectada. Quedan por decidir la licencia y confirmar edad y residencia de los integrantes
+según [las bases de la convocatoria](https://youcam-api-skin-ai-ecommerce.devpost.com/rules).
+
+Las pruebas de integración simulan los proveedores. Esta revisión no envió nuevas fotos,
+no ejecutó generaciones de pago ni alteró las cuentas o datos reales de Supabase.
+
+## Auditoría anterior
+
 Fecha: 31 de octubre de 2026.
 
 Se revisaron las rutas de API, el flujo de prendas → fotos → perfil → veredicto → look,
