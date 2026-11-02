@@ -46,3 +46,6 @@ next-env.d.ts
 
 # dev-only cache of YouCam results (saves API units while developing)
 /.cache/
+
+# demo video over GitHub's 100 MB limit (kept locally only)
+/media-export/clara-demo-youtube.mp4
